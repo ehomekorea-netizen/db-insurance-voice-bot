@@ -38,12 +38,15 @@ export function VoiceCounselorApp() {
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [activeTab, setActiveTab] = useState<"voice" | "chat">("voice");
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "system",
       content:
-        "MVP 데모입니다. 현재 약관 데이터는 샘플이며, 실제 배포 전 DB손해보험 공식 약관 원문으로 인덱스를 교체해야 합니다."
+        "안녕하세요. DB손해보험 AI 보험 상담원입니다. 대화를 통해 약관 및 보장 내역을 문의하시거나 하단 채팅을 이용해보세요."
     }
   ]);
 
@@ -53,9 +56,9 @@ export function VoiceCounselorApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const statusLabel = useMemo(() => {
-    if (isConnecting) return "Realtime 연결 중";
-    if (isConnected) return "음성 상담 연결됨";
-    return "대기 중";
+    if (isConnecting) return "AI 상담원 호출 중...";
+    if (isConnected) return "상담 연결 완료 (음성)";
+    return "연결 대기 중";
   }, [isConnecting, isConnected]);
 
   async function startRealtime() {
@@ -199,7 +202,7 @@ export function VoiceCounselorApp() {
         call_id: callId,
         output: JSON.stringify({
           status: "sent_to_chat",
-          spoken_message: "답변은 채팅창으로 보내드리겠습니다.",
+          spoken_message: "상세 약관 확인 결과는 하단 채팅 화면에 전송해드렸습니다. 확인해 보세요.",
           chat_answer_id: answer.id,
           citation_count: answer.citations.length
         })
@@ -210,7 +213,7 @@ export function VoiceCounselorApp() {
       type: "response.create",
       response: {
         instructions:
-          "도구 결과의 spoken_message만 한국어로 짧게 말하세요. 약관 내용은 말하지 마세요."
+          "도구 결과의 spoken_message만 한국어로 짧게 말하세요. 약관의 긴 조항이나 리스트는 절대로 말하지 마세요."
       }
     });
   }
@@ -264,6 +267,18 @@ export function VoiceCounselorApp() {
         ...message
       } as ChatMessage
     ]);
+
+    // Switch check and unread count
+    if (message.role === "assistant" && activeTab !== "chat") {
+      setUnreadCount((prev) => prev + 1);
+    }
+  }
+
+  function handleTabChange(tab: "voice" | "chat") {
+    setActiveTab(tab);
+    if (tab === "chat") {
+      setUnreadCount(0);
+    }
   }
 
   return (
@@ -272,68 +287,85 @@ export function VoiceCounselorApp() {
         <div className="brand">
           <div className="brand-mark">DB</div>
           <div>
-            <h1>DB손해보험 약관 보이스 상담봇 MVP</h1>
-            <p>Realtime 음성 상담은 짧게, 약관 근거 답변은 채팅으로 길게 제공합니다.</p>
+            <h1>DB손해보험 AI 보이스 상담원</h1>
+            <p className="subtitle">공식 공시실 기반 스마트 약관 RAG 검색 서비스</p>
           </div>
         </div>
-        <div className={`status-pill ${isConnected ? "connected" : ""}`}>
+        <div className={`status-pill ${isConnected ? "connected" : ""} ${isConnecting ? "connecting" : ""}`}>
           <span className="status-dot" />
           {statusLabel}
         </div>
       </header>
 
       <section className="workspace">
-        <aside className="panel voice-panel">
+        {/* LEFT: VOICE VIEW */}
+        <aside className={`panel voice-panel ${activeTab === "voice" ? "active" : ""}`}>
           <div className="voice-stage">
-            <div className={`orb ${isConnected ? "listening" : ""}`} aria-hidden="true" />
-            <div>
-              <h2>{isConnected ? "듣고 있습니다" : "음성 상담 시작"}</h2>
+            <div className="orb-container">
+              <div className={`orb-glow ${isConnected ? "active" : ""}`} />
+              <div className={`orb-ring ring-1 ${isConnected ? "active" : ""}`} />
+              <div className={`orb-ring ring-2 ${isConnected ? "active" : ""}`} />
+              <div className={`orb ${isConnected ? "listening" : ""} ${isConnecting ? "connecting" : ""}`} aria-hidden="true">
+                <div className="orb-inner" />
+              </div>
+            </div>
+            <div className="stage-caption">
+              <h2>{isConnected ? "음성 상담 진행 중" : isConnecting ? "연결 요청 중" : "AI 상담 시작하기"}</h2>
               <p>
-                사용자가 긴 약관 설명을 요구하면 음성은 짧게 응답하고, 조항과 조건은 오른쪽
-                채팅창으로 보냅니다.
+                {isConnected 
+                  ? "보험 약관에 대해 궁금한 점을 자연스럽게 말씀해보세요." 
+                  : "음성 연결을 누르시면 마이크를 통해 대화를 시작할 수 있습니다."}
               </p>
             </div>
           </div>
 
           <div className="controls">
-            <button
-              className="primary-button"
-              onClick={startRealtime}
-              disabled={isConnecting || isConnected}
-            >
-              음성 연결
-            </button>
-            <button
-              className="ghost-button danger"
-              onClick={stopRealtime}
-              disabled={!isConnecting && !isConnected}
-            >
-              연결 종료
-            </button>
+            {!isConnected && !isConnecting ? (
+              <button className="primary-button call-btn" onClick={startRealtime}>
+                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27 11.72 11.72 0 003.74.6 1 1 0 011 1v3.5a1 1 0 01-1 1A16 16 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.72 11.72 0 00.6 3.74 1 1 0 01-.27 1.1l-2.2 2.2z" />
+                </svg>
+                상담원 연결
+              </button>
+            ) : (
+              <button className="danger-button hangup-btn" onClick={stopRealtime} disabled={isConnecting}>
+                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                </svg>
+                상담 종료
+              </button>
+            )}
           </div>
 
-          {liveTranscript ? <div className="hint-box">봇 음성: {liveTranscript}</div> : null}
-          {error ? <div className="hint-box error">{error}</div> : null}
+          {liveTranscript && (
+            <div className="live-transcript-bubble">
+              <span className="speaker-tag">AI 상담원</span>
+              <p className="transcript-text">{liveTranscript}</p>
+            </div>
+          )}
 
-          <div className="hint-box runbook">
-            <h3>MVP 운영 기준</h3>
-            <ol>
-              <li>Realtime 모델은 intent 파악과 짧은 음성 안내만 담당합니다.</li>
-              <li>약관 검색과 긴 답변은 백엔드 API가 생성해 채팅에 표시합니다.</li>
-              <li>실제 배포 전 공식 약관 PDF와 공시 URL 인덱싱이 필요합니다.</li>
-            </ol>
+          {error && <div className="toast-error">{error}</div>}
+
+          <div className="quick-guide">
+            <h3>💡 음성 질문 예시</h3>
+            <ul>
+              {EXAMPLE_QUESTIONS.map((q, idx) => (
+                <li key={idx} onClick={() => setInput(q)} className="guide-item">
+                  "{q}"
+                </li>
+              ))}
+            </ul>
           </div>
         </aside>
 
-        <section className="panel chat-panel">
+        {/* RIGHT: CHAT VIEW */}
+        <section className={`panel chat-panel ${activeTab === "chat" ? "active" : ""}`}>
           <div className="chat-header">
-            <h2>채팅 답변</h2>
-            <p>
-              긴 답변은 요약, 적용 조건, 주의사항, 근거 조항, 확인 필요사항으로 나누어 표시합니다.
-            </p>
+            <h2>상세 약관 리포트</h2>
+            <p>공식 웹사이트 검색에 기반한 정확한 보장 조건과 출처 조항을 한 눈에 확인합니다.</p>
           </div>
 
-          <div className="messages">
+          <div className="messages-area">
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
@@ -343,60 +375,133 @@ export function VoiceCounselorApp() {
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={EXAMPLE_QUESTIONS[0]}
+              placeholder="약관이나 가입 조건을 여기에 텍스트로 물어보세요..."
               aria-label="약관 질문"
             />
-            <button className="secondary-button" type="submit">
-              질문
+            <button className="secondary-button" type="submit" disabled={!input.trim()}>
+              전송
             </button>
           </form>
         </section>
       </section>
+
+      {/* MOBILE BOTTOM NAV BAR */}
+      <nav className="bottom-nav">
+        <button
+          className={`nav-item ${activeTab === "voice" ? "active" : ""}`}
+          onClick={() => handleTabChange("voice")}
+        >
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3z" />
+          </svg>
+          <span>음성 상담</span>
+        </button>
+        <button
+          className={`nav-item ${activeTab === "chat" ? "active" : ""}`}
+          onClick={() => handleTabChange("chat")}
+        >
+          <div className="chat-badge-wrapper">
+            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.9 2.78 2.9h12.94c1.66 0 2.78-1.3 2.78-2.9V6.49c0-1.6-1.12-2.9-2.78-2.9H3.47c-1.66 0-2.78 1.3-2.78 2.9v9.26z" />
+            </svg>
+            {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+          </div>
+          <span>상세 답변</span>
+        </button>
+      </nav>
     </main>
   );
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === "assistant" && message.answer) {
+    const ans = message.answer;
     return (
       <article className="message assistant answer-card">
-        <h3>약관 기준 답변</h3>
-        <AnswerSection title="요약" items={[message.answer.summary]} />
-        <AnswerSection title="적용 가능 조건" items={message.answer.conditions} />
-        <AnswerSection title="주의/제외 가능 조건" items={message.answer.cautions} />
-        <AnswerSection title="확인 필요 정보" items={message.answer.requiredInfo} />
-        <div className="answer-section">
-          <strong>근거</strong>
-          {message.answer.citations.map((citation) => (
-            <div className="citation" key={citation.id}>
-              {citation.title} / {citation.section}
-              <small>
-                p.{citation.page} · {citation.version} · {citation.sourceUrl}
-              </small>
-              <small>{citation.excerpt}</small>
+        <div className="card-top">
+          <span className="card-logo-badge">DB손보</span>
+          <span className="card-category-tag">약관 분석 리포트</span>
+        </div>
+
+        {ans.summary && (
+          <div className="answer-section">
+            <h4 className="section-title summary-style">💡 핵심 요약</h4>
+            <p className="summary-text">{ans.summary}</p>
+          </div>
+        )}
+
+        {ans.conditions && ans.conditions.length > 0 && (
+          <div className="answer-section">
+            <h4 className="section-title conditions-style">✅ 보장 대상 및 지급 조건</h4>
+            <ul className="bullet-list green-theme">
+              {ans.conditions.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {ans.cautions && ans.cautions.length > 0 && (
+          <div className="answer-section">
+            <h4 className="section-title cautions-style">⚠️ 보장 제외 및 유의사항 (면책)</h4>
+            <ul className="bullet-list orange-theme">
+              {ans.cautions.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {ans.requiredInfo && ans.requiredInfo.length > 0 && (
+          <div className="answer-section">
+            <h4 className="section-title info-style">📋 정확한 확인을 위해 필요한 정보</h4>
+            <ul className="bullet-list blue-theme">
+              {ans.requiredInfo.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {ans.citations && ans.citations.length > 0 && (
+          <div className="answer-section">
+            <h4 className="section-title citation-style">🔗 공식 출처 및 공시 자료</h4>
+            <div className="citations-grid">
+              {ans.citations.map((citation) => (
+                <a
+                  href={citation.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="citation-card"
+                  key={citation.id}
+                >
+                  <div className="citation-header">
+                    <span className="citation-name">{citation.title}</span>
+                    <span className="citation-section">{citation.section}</span>
+                  </div>
+                  {citation.excerpt && <p className="citation-excerpt">"{citation.excerpt}"</p>}
+                  <div className="citation-footer">
+                    <span className="citation-ver">{citation.version}</span>
+                    <span className="citation-link-action">공식 홈 바로가기 ↗</span>
+                  </div>
+                </a>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="answer-section">
-          <strong>면책 안내</strong>
-          <span>{message.answer.disclaimer}</span>
-        </div>
+          </div>
+        )}
+
+        {ans.disclaimer && (
+          <footer className="card-disclaimer">
+            <p>{ans.disclaimer}</p>
+          </footer>
+        )}
       </article>
     );
   }
 
-  return <div className={`message ${message.role}`}>{message.content}</div>;
-}
-
-function AnswerSection({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="answer-section">
-      <strong>{title}</strong>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
+    <div className={`message ${message.role === "user" ? "user-bubble" : "system-bubble"}`}>
+      {message.content}
     </div>
   );
 }
