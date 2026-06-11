@@ -162,8 +162,25 @@ export async function POST(request: Request) {
           query: searchQuery,
           search_depth: "advanced",
           include_raw_content: true,
-          include_domains: ["idb.co.kr", "idbins.com", "disclosure.idbins.com", "fss.or.kr", "tistory.com", "naver.com"],
-          max_results: 3
+          include_domains: [
+            "idb.co.kr",
+            "idbins.com",
+            "disclosure.idbins.com",
+            "fss.or.kr",
+            "knia.or.kr",
+            "klia.or.kr",
+            "e-insmarket.or.kr",
+            "kidi.or.kr",
+            "insnews.co.kr",
+            "ppomppu.co.kr",
+            "clien.net",
+            "bobaedream.co.kr",
+            "dcinside.com",
+            "cafe.naver.com",
+            "blog.naver.com",
+            "tistory.com"
+          ],
+          max_results: 5
         }),
         signal: controller.signal
       });
@@ -203,7 +220,7 @@ export async function POST(request: Request) {
         return true;
       });
 
-      finalResults = filteredResults.length > 0 ? filteredResults : results.slice(0, 1);
+      finalResults = filteredResults.length > 0 ? filteredResults.slice(0, 4) : results.slice(0, 3);
 
       if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
         searchContext = finalResults.map((r: any, i: number) => {
@@ -299,14 +316,40 @@ ${searchContext}`
       cautions = rawCautions.split("\n").map(l => l.replace(/^-\s*/, "").trim()).filter(Boolean);
     }
 
+    // Helper to determine citation section category based on domain/url
+    const getCitationSection = (url: string): string => {
+      const lowUrl = (url || "").toLowerCase();
+      if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) {
+        return "DB손보 공식";
+      }
+      if (lowUrl.includes("fss.or.kr")) {
+        return "금융감독원";
+      }
+      if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) {
+        return "보험협회";
+      }
+      if (
+        lowUrl.includes("ppomppu.co.kr") ||
+        lowUrl.includes("clien.net") ||
+        lowUrl.includes("bobaedream.co.kr") ||
+        lowUrl.includes("dcinside.com")
+      ) {
+        return "커뮤니티";
+      }
+      if (lowUrl.includes("naver.com") || lowUrl.includes("tistory.com")) {
+        return "블로그/지식iN";
+      }
+      return "참고자료";
+    };
+
     // 5. Generate high-quality citations
     const citations = finalResults
       .map((r: any, i: number) => ({
         id: `citation-${i + 1}-${r.url ? crypto.randomUUID().substring(0, 8) : "unknown"}`,
         title: r.title || "DB손해보험 공식 공시실",
-        section: "상품 공시/기초서류",
+        section: getCitationSection(r.url),
         page: 1,
-        version: productHint || "공식 공시 정보",
+        version: productHint || "공식 정보",
         sourceUrl: r.url || "https://disclosure.idbins.com/",
         excerpt: (r.raw_content || r.content || "").substring(0, 200) + "..."
       }));

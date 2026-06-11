@@ -5,27 +5,12 @@ import type { PolicyAnswer, PolicyIntent } from "@/lib/policyKnowledge";
 
 
 type ChatMessage =
-  | { id: string; role: "system" | "user"; content: string }
-  | { id: string; role: "assistant"; content: string; answer?: PolicyAnswer };
+  | { id: string; role: "system" | "user"; content: string; timestamp?: string }
+  | { id: string; role: "assistant"; content: string; answer?: PolicyAnswer; timestamp?: string };
 
 type ChatMessageInput =
-  | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string; answer?: PolicyAnswer };
-
-type RealtimeEvent = {
-  type?: string;
-  delta?: string;
-  transcript?: string;
-  item?: {
-    type?: string;
-    name?: string;
-    call_id?: string;
-    arguments?: string;
-  };
-  name?: string;
-  call_id?: string;
-  arguments?: string;
-};
+  | { role: "system" | "user"; content: string; timestamp?: string }
+  | { role: "assistant"; content: string; answer?: PolicyAnswer; timestamp?: string };
 
 export function VoiceCounselorApp() {
   const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
@@ -386,21 +371,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected) {
-      const now = new Date();
-      const formattedTime = now.toLocaleString("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      });
-      addMessage({
-        role: "system",
-        content: `━━━ 음성 상담 종료 (${formattedTime}) ━━━`
-      });
-    }
+    // Removed call-end system message per user request (times are now embedded in report cards)
 
     setIsConnected(false);
     setIsConnecting(false);
@@ -446,10 +417,21 @@ export function VoiceCounselorApp() {
       ? `${payload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
       : payload.summary;
 
+    const now = new Date();
+    const formattedTime = now.toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+
     addMessage({
       role: "assistant",
       content: contentText,
-      answer: payload
+      answer: payload,
+      timestamp: formattedTime
     });
 
     return payload;
@@ -738,28 +720,24 @@ function MessageBubble({
 
         {ans.citations && ans.citations.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title citation-style">🔗 공식 출처 및 공시 자료</h4>
-            <div className="citations-grid">
+            <h4 className="section-title citation-style">🔗 참고 출처 및 공시 자료</h4>
+            <ul style={{ listStyleType: "none", paddingLeft: 0, margin: "8px 0 0 0", display: "flex", flexDirection: "column", gap: "8px" }}>
               {ans.citations.map((citation) => (
-                <a
-                  href={citation.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="citation-card"
-                  key={citation.id}
-                >
-                  <div className="citation-header">
-                    <span className="citation-name">{safeDecodeURIComponent(citation.title)}</span>
-                    <span className="citation-section">{citation.section}</span>
-                  </div>
-                  {citation.excerpt && <p className="citation-excerpt">"{safeDecodeURIComponent(citation.excerpt)}"</p>}
-                  <div className="citation-footer">
-                    <span className="citation-ver">{citation.version}</span>
-                    <span className="citation-link-action">공식 홈 바로가기 ↗</span>
-                  </div>
-                </a>
+                <li key={citation.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", lineHeight: "1.4" }}>
+                  <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#f1f5f9", color: "#475569", fontSize: "10px", fontWeight: "bold", border: "1px solid #e2e8f0", flexShrink: 0 }}>
+                    {citation.section || "공시자료"}
+                  </span>
+                  <a
+                    href={citation.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#0066cc", textDecoration: "underline", fontWeight: "500", wordBreak: "break-all" }}
+                  >
+                    {safeDecodeURIComponent(citation.title)}
+                  </a>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         )}
 
@@ -768,6 +746,10 @@ function MessageBubble({
             <p>{ans.disclaimer}</p>
           </footer>
         )}
+
+        <div className="card-timestamp" style={{ textAlign: "right", fontSize: "11px", color: "#94a3b8", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
+          조회 시간: {message.timestamp || new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}
+        </div>
       </article>
     );
   }
