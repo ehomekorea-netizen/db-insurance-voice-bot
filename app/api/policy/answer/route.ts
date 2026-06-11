@@ -50,6 +50,52 @@ General Rules:
   }
 }
 
+// Classify if user query is a simple greeting/conversational phrase or a detailed policy query requiring RAG
+async function classifyConversationalOrRag(openai: OpenAI, question: string): Promise<{ isSimpleChat: boolean; answer: string }> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a classification assistant for a Korean insurance voice counselor bot.
+Analyze the user's message. Determine if it is a simple conversational query (greeting like "안녕하세요", "반갑습니다", checking capability like "뭘 도와줄 수 있어?", acknowledgment like "알겠어", "감사합니다", "그래", "오케이", or short chat) or a specific policy query that requires actual insurance policy document search/RAG analysis (e.g. asking about coverage, exclusions, required claim documents, terms).
+
+If the message is a simple conversational query:
+Return a JSON object with:
+"isSimpleChat": true
+"answer": "A short, professional, and friendly response in Korean (1-2 sentences) matching the DB Insurance counselor's identity (e.g. "안녕하세요! DB손해보험 동목포 부지점장 프로미입니다. 무엇을 도와드릴까요?")."
+
+If the message requires searching policy/rules/documents (RAG):
+Return a JSON object with:
+"isSimpleChat": false
+"answer": ""
+
+Output ONLY valid JSON. Do not include markdown code block formatting like \`\`\`json.`
+        },
+        {
+          role: "user",
+          content: question
+        }
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message?.content?.trim();
+    if (content) {
+      const parsed = JSON.parse(content);
+      return {
+        isSimpleChat: !!parsed.isSimpleChat,
+        answer: parsed.answer || ""
+      };
+    }
+  } catch (err) {
+    console.error("Classification failed, default to RAG:", err);
+  }
+  return { isSimpleChat: false, answer: "" };
+}
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest;
   const question = body.question?.trim();
@@ -76,7 +122,25 @@ export async function POST(request: Request) {
   try {
     const openai = new OpenAI({ apiKey });
 
-    // 1. Optimize search query to get clean Korean terms instead of conversational sentence
+    // 1. Classify if it's a simple conversational message or a detailed RAG query
+    const classification = await classifyConversationalOrRag(openai, question);
+    if (classification.isSimpleChat) {
+      return NextResponse.json({
+        id: crypto.randomUUID(),
+        question,
+        intent: "policy_explanation",
+        analysis: "",
+        summary: classification.answer,
+        conditions: [],
+        cautions: [],
+        requiredInfo: [],
+        citations: [],
+        disclaimer: "",
+        isSimpleChat: true
+      });
+    }
+
+    // 2. Optimize search query to get clean Korean terms instead of conversational sentence
     const searchQuery = await generateSearchQuery(openai, question, productHint);
     console.log(`Tavily 검색 실행 (최적화): ${searchQuery}`);
 

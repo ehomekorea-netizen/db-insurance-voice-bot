@@ -40,31 +40,6 @@ export function VoiceCounselorApp() {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isMicMuted, setIsMicMuted] = useState(false);
 
-  const unmuteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  function setMicMuted(muted: boolean) {
-    setIsMicMuted(muted);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        if (track.kind === "audio") {
-          track.enabled = !muted;
-        }
-      });
-    }
-
-    if (recognitionRef.current) {
-      try {
-        if (muted) {
-          recognitionRef.current.abort();
-        } else {
-          recognitionRef.current.start();
-        }
-      } catch (e) {
-        // Swallowing already started/stopped exceptions
-      }
-    }
-  }
-
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -74,16 +49,13 @@ export function VoiceCounselorApp() {
     }
   ]);
 
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const processedCallIdsRef = useRef<Set<string>>(new Set());
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const optimisticMessageIdRef = useRef<string | null>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isPlayingAudio = useRef(false);
   const isFinalEndingPending = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -91,28 +63,89 @@ export function VoiceCounselorApp() {
     return "음성 대기 중";
   }, [isConnecting, isConnected]);
 
-  // Monitor active conversation states to manage 20-second inactivity timer
-  useEffect(() => {
+  // Audio Playback with TTS
+  async function playTts(text: string): Promise<void> {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    
+    // Show text transcript live as assistant speaking indicator
+    setLiveTranscript(text);
+    isPlayingAudio.current = true;
+
+    // Turn off user SpeechRecognition while AI speaks to prevent echo feedback loop
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      if (!response.ok) {
+        throw new Error("TTS generation failed");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      activeAudioRef.current = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => {
+          activeAudioRef.current = null;
+          setLiveTranscript("");
+          isPlayingAudio.current = false;
+          resolve();
+        };
+        audio.onerror = (e) => {
+          activeAudioRef.current = null;
+          setLiveTranscript("");
+          isPlayingAudio.current = false;
+          reject(e);
+        };
+        audio.play().catch((err) => {
+          activeAudioRef.current = null;
+          setLiveTranscript("");
+          isPlayingAudio.current = false;
+          reject(err);
+        });
+      });
+    } catch (err) {
+      console.error("playTts error:", err);
+      setLiveTranscript("");
+      isPlayingAudio.current = false;
+    }
+  }
+
+  // Monitor 20-second inactivity timer
+  function resetInactivityTimer() {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected && !isMicMuted && !isSearching && !isFinalEndingPending.current) {
+    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending.current) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
         setError("20초 동안 대화가 없어 음성 상담이 자동으로 종료되었습니다.");
       }, 20 * 1000);
     }
+  }
 
+  useEffect(() => {
+    resetInactivityTimer();
     return () => {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
-        inactivityTimerRef.current = null;
       }
     };
-  }, [isConnected, isMicMuted, isSearching]);
+  }, [isConnected, isMicMuted, isSearching, isFinalEndingPending.current]);
 
   // Monitor session duration & enforce 3-minute hard cap
   useEffect(() => {
@@ -137,7 +170,7 @@ export function VoiceCounselorApp() {
     };
   }, [isConnected]);
 
-  // Monitor visibility state to disconnect WebRTC in background
+  // Monitor visibility state to disconnect in background
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === "hidden") {
@@ -148,158 +181,163 @@ export function VoiceCounselorApp() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
     };
   }, []);
 
   // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, liveTranscript, isSearching]);
+  }, [messages, liveTranscript, isSearching, userLiveTranscript]);
+
+  function startSpeechRecognition() {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition not supported in this browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "ko-KR";
+
+    recognition.onresult = (event: any) => {
+      // Clear 20-second inactivity timer while user is actively speaking
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+
+      let interimTranscript = "";
+      let finalTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      const currentLiveText = (interimTranscript || finalTranscript).trim();
+      if (currentLiveText) {
+        setUserLiveTranscript(currentLiveText);
+
+        // Reset silence detection timer (VAD threshold)
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+        }
+
+        silenceTimeoutRef.current = setTimeout(() => {
+          const finalQuestion = currentLiveText;
+          if (finalQuestion) {
+            void handleUserVoiceQuery(finalQuestion);
+          }
+        }, 1800);
+      }
+    };
+
+    recognition.onerror = (e: any) => {
+      console.warn("SpeechRecognition error:", e.error);
+    };
+
+    recognition.onend = () => {
+      console.log("SpeechRecognition ended");
+      // Auto restart if connected, not playing audio, and not searching
+      if (isConnected && !isPlayingAudio.current && !isSearching && !isMicMuted) {
+        try {
+          recognition.start();
+        } catch {}
+      }
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch (err) {
+      console.error("Failed to start SpeechRecognition:", err);
+    }
+  }
+
+  async function handleUserVoiceQuery(question: string) {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+
+    // Stop recording and clear live transcript display
+    isPlayingAudio.current = true;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+    setUserLiveTranscript("");
+
+    // Optimistically add user bubble
+    addMessage({ role: "user", content: question });
+
+    setIsSearching(true);
+    setError(null);
+
+    try {
+      const payload = await requestPolicyAnswer(question);
+      setIsSearching(false);
+
+      if (payload.isSimpleChat) {
+        // A. Simple Conversational Answer
+        await playTts(payload.summary);
+        
+        isPlayingAudio.current = false;
+        if (isConnected && !isMicMuted) {
+          startSpeechRecognition();
+          resetInactivityTimer();
+        }
+      } else {
+        // B. RAG Policy Answer
+        isFinalEndingPending.current = true;
+        await playTts("답변과 함께 상담은 자동종료됩니다.");
+        isFinalEndingPending.current = false;
+        stopRealtime();
+      }
+    } catch (err: any) {
+      setIsSearching(false);
+      setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
+      
+      // Play error fallback message
+      await playTts("죄송합니다. 약관 조회 중 일시적인 오류가 발생했습니다. 다시 말씀해 주시겠어요?");
+      
+      isPlayingAudio.current = false;
+      if (isConnected && !isMicMuted) {
+        startSpeechRecognition();
+        resetInactivityTimer();
+      }
+    }
+  }
 
   async function startRealtime() {
     setError(null);
     setIsConnecting(true);
+    isPlayingAudio.current = true;
 
     try {
-      const tokenResponse = await fetch("/api/realtime/token", { method: "POST" });
-      const tokenData = await tokenResponse.json();
+      setIsConnected(true);
+      setIsConnecting(false);
 
-      if (!tokenResponse.ok) {
-        console.error("Token fetch failed:", tokenData);
-        const detailMsg = tokenData.detail?.error?.message || (tokenData.detail ? JSON.stringify(tokenData.detail) : "");
-        throw new Error(`${tokenData.error ?? "Realtime token 발급 실패"} ${detailMsg ? `(${detailMsg})` : ""}`);
+      // Play welcome greeting
+      await playTts("PA님 무엇을 도와드릴까요?");
+
+      isPlayingAudio.current = false;
+      if (!isMicMuted) {
+        startSpeechRecognition();
       }
-
-      const ephemeralKey = tokenData.value ?? tokenData.client_secret?.value;
-      if (!ephemeralKey) {
-        throw new Error("Realtime client secret 응답에서 value를 찾지 못했습니다.");
-      }
-
-      const pc = new RTCPeerConnection();
-      pcRef.current = pc;
-
-      const audio = new Audio();
-      audio.autoplay = true;
-      audioRef.current = audio;
-
-      pc.ontrack = (event) => {
-        audio.srcObject = event.streams[0];
-        void audio.play().catch(() => undefined);
-      };
-
-      // Explicitly enable echoCancellation and noiseSuppression to prevent feedback loops on mobile speakers
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      streamRef.current = stream;
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      const dc = pc.createDataChannel("oai-events");
-      dcRef.current = dc;
-      dc.onopen = () => {
-        setIsConnected(true);
-        setIsConnecting(false);
-
-        // Disable server VAD initially to prevent connection click/pop noise from triggering a response
-        sendRealtimeEvent({
-          type: "session.update",
-          session: {
-            input_audio_transcription: {
-              model: "whisper-1",
-              language: "ko"
-            },
-            turn_detection: null
-          }
-        });
-
-        // Initialize Web Speech API for real-time user transcription mapping as they speak
-        if (typeof window !== "undefined") {
-          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-          if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = "ko-KR";
-
-            recognition.onresult = (event: any) => {
-              let interimTranscript = "";
-              let finalTranscript = "";
-
-              for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                  finalTranscript += event.results[i][0].transcript;
-                } else {
-                  interimTranscript += event.results[i][0].transcript;
-                }
-              }
-
-              const currentLiveText = (interimTranscript || finalTranscript).trim();
-              if (currentLiveText) {
-                setUserLiveTranscript(currentLiveText);
-              }
-            };
-
-            recognition.onerror = (e: any) => {
-              console.warn("SpeechRecognition error:", e.error);
-            };
-
-            recognition.onend = () => {
-              console.log("SpeechRecognition ended");
-            };
-
-            recognitionRef.current = recognition;
-            try {
-              recognition.start();
-            } catch (err) {
-              console.error("Failed to start SpeechRecognition:", err);
-            }
-          }
-        }
-
-        // Stabilize mic stream pop noise to prevent VAD from interrupting the initial greeting
-        setTimeout(() => {
-          sendRealtimeEvent({
-            type: "response.create",
-            response: {
-              instructions: "사용자에게 한국어로 'PA님 무엇을 도와드릴까요?'라고 단 한 문장으로 간결하게 첫 인사를 하십시오. 다른 불필요한 안내 멘트는 절대로 추가하지 마십시오."
-            }
-          });
-        }, 800);
-      };
-      dc.onmessage = (event) => {
-        handleRealtimeEvent(event.data);
-      };
-      dc.onerror = () => setError("Realtime data channel 오류가 발생했습니다.");
-      dc.onclose = () => setIsConnected(false);
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
-          "Content-Type": "application/sdp"
-        }
-      });
-
-      if (!sdpResponse.ok) {
-        throw new Error(await sdpResponse.text());
-      }
-
-      const answer: RTCSessionDescriptionInit = {
-        type: "answer",
-        sdp: await sdpResponse.text()
-      };
-      await pc.setRemoteDescription(answer);
     } catch (cause) {
       stopRealtime();
       setIsConnecting(false);
@@ -308,16 +346,27 @@ export function VoiceCounselorApp() {
   }
 
   function stopRealtime() {
-    dcRef.current?.close();
-    pcRef.current?.close();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    audioRef.current?.pause();
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
 
-    dcRef.current = null;
-    pcRef.current = null;
-    streamRef.current = null;
-    audioRef.current = null;
-    processedCallIdsRef.current.clear();
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
 
     if (isConnected) {
       const now = new Date();
@@ -338,244 +387,25 @@ export function VoiceCounselorApp() {
     setIsConnected(false);
     setIsConnecting(false);
     setIsMicMuted(false);
+    isPlayingAudio.current = false;
     isFinalEndingPending.current = false;
     setUserLiveTranscript("");
     setLiveTranscript("");
+  }
+
+  function setMicMuted(muted: boolean) {
+    setIsMicMuted(muted);
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.abort();
-      } catch {}
-      recognitionRef.current = null;
-    }
-    if (unmuteTimeoutRef.current) {
-      clearTimeout(unmuteTimeoutRef.current);
-      unmuteTimeoutRef.current = null;
-    }
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-  }
-
-  function sendRealtimeEvent(payload: unknown) {
-    const channel = dcRef.current;
-    if (channel?.readyState === "open") {
-      channel.send(JSON.stringify(payload));
-    }
-  }
-
-  function handleRealtimeEvent(rawData: string) {
-    const event = safeJsonParse<RealtimeEvent>(rawData);
-    if (!event?.type) return;
-
-    // Debug: log all event types for transcription troubleshooting
-    if (event.type.includes("transcription") || event.type.includes("input_audio") || event.type === "error" || event.type === "session.updated") {
-      console.log("[Realtime Event]", event.type, event);
-    }
-
-    // Handle session errors
-    if (event.type === "error") {
-      console.error("[Realtime Error]", event);
-      setMicMuted(false);
-    }
-
-    // Mute mic when AI response is created (begins generation/playback)
-    if (event.type === "response.created") {
-      if (unmuteTimeoutRef.current) {
-        clearTimeout(unmuteTimeoutRef.current);
-        unmuteTimeoutRef.current = null;
-      }
-      setMicMuted(true);
-      setUserLiveTranscript("");
-      sendRealtimeEvent({
-        type: "session.update",
-        session: {
-          turn_detection: null
-        }
-      });
-    }
-
-    // Create optimistic user bubble when user actually starts speaking
-    if (event.type === "input_audio_buffer.speech_started") {
-      setUserLiveTranscript("음성 인식 중...");
-    }
-
-    // Assistant speech: live delta
-    if (event.type === "response.output_audio_transcript.delta" && event.delta) {
-      setLiveTranscript((current) => `${current}${event.delta}`);
-      // Ensure mic is muted during speech playback
-      setMicMuted(true);
-    }
-
-    // Assistant speech: completed
-    if (event.type === "response.output_audio_transcript.done") {
-      const text = event.transcript || liveTranscript;
-      const cleaned = text.trim();
-      if (cleaned) {
-        addMessage({ role: "assistant", content: cleaned });
-      }
-      setLiveTranscript("");
-    }
-
-    // Response done: unmute mic and enable VAD dynamically
-    if (event.type === "response.done") {
-      if (isFinalEndingPending.current) {
-        setTimeout(() => {
-          isFinalEndingPending.current = false;
-          stopRealtime();
-        }, 3000);
-        return;
-      }
-
-      if (unmuteTimeoutRef.current) {
-        clearTimeout(unmuteTimeoutRef.current);
-      }
-      unmuteTimeoutRef.current = setTimeout(() => {
-        setMicMuted(false);
-        unmuteTimeoutRef.current = null;
-
-        // Dynamically enable server VAD now that AI has finished speaking
-        sendRealtimeEvent({
-          type: "session.update",
-          session: {
-            turn_detection: {
-              type: "server_vad",
-              threshold: 0.92,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 1000
-            }
+        if (muted) {
+          recognitionRef.current.abort();
+        } else {
+          if (isConnected && !isPlayingAudio.current) {
+            recognitionRef.current.start();
           }
-        });
-      }, 1000);
-    }
-
-    // User speech: live delta (real-time as user speaks)
-    if (event.type === "conversation.item.input_audio_transcription.delta" && event.delta) {
-      setUserLiveTranscript((current) => `${current}${event.delta}`);
-    }
-
-    // User speech: completed transcription
-    if (event.type === "conversation.item.input_audio_transcription.completed") {
-      setUserLiveTranscript("");
-      const transcriptText = (event.transcript || "").trim();
-      if (transcriptText) {
-        setMessages((current) => {
-          const lastMsg = current[current.length - 1];
-          if (lastMsg && lastMsg.role === "user" && lastMsg.content === transcriptText) {
-            return current;
-          }
-          return [...current, { id: `user-${Date.now()}`, role: "user", content: transcriptText }];
-        });
-      }
-    }
-
-    if (
-      event.type === "response.function_call_arguments.done" &&
-      event.name === "prepare_policy_answer" &&
-      event.call_id
-    ) {
-      void preparePolicyAnswer(event.call_id, event.arguments ?? "{}");
-    }
-  }
-
-  async function preparePolicyAnswer(callId: string, rawArguments: string) {
-    if (processedCallIdsRef.current.has(callId)) return;
-    processedCallIdsRef.current.add(callId);
-
-    const args = safeJsonParse<{ question?: string; intent?: PolicyIntent; product_hint?: string }>(rawArguments) ?? {};
-    const question = args.question?.trim() || "사용자 약관 질문";
-
-    const isConfirmation = (text: string) => {
-      const clean = text.trim().replace(/[\s,.!~?]+/g, "");
-      return ["네", "맞아요", "네맞아요", "응", "어", "맞아", "예", "맞습니다", "그렇습니다", "그럼요", "네그렇습니다", "ok", "yes", "y"].includes(clean.toLowerCase());
-    };
-
-    // Deduplicate user bubble
-    setMessages((current) => {
-      // If there is already a substantial user message in the history, we don't insert a fake question.
-      const hasExistingQuery = current.some(
-        (m) =>
-          m.role === "user" &&
-          m.content.length > 5 &&
-          !isConfirmation(m.content)
-      );
-
-      if (hasExistingQuery) {
-        return current;
-      }
-
-      const lastMsg = current[current.length - 1];
-      if (
-        lastMsg &&
-        lastMsg.role === "user" &&
-        (lastMsg.content.includes(question) || question.includes(lastMsg.content))
-      ) {
-        return current;
-      }
-      return [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "user",
-          content: question
         }
-      ];
-    });
-
-    setIsSearching(true);
-    let answerPayload: PolicyAnswer | null = null;
-
-    try {
-      answerPayload = await requestPolicyAnswer(question, args.intent, args.product_hint);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
-      sendRealtimeEvent({
-        type: "conversation.item.create",
-        item: {
-          type: "function_call_output",
-          call_id: callId,
-          output: JSON.stringify({
-            status: "error",
-            spoken_message: "죄송합니다. 약관 조회 중 일시적인 오류가 발생했습니다. 다시 말씀해 주시겠어요?",
-            chat_answer_id: "error",
-            citation_count: 0
-          })
-        }
-      });
-      sendRealtimeEvent({
-        type: "response.create",
-        response: {
-          instructions:
-            "도구 결과의 spoken_message를 친절하고 명확하게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
-        }
-      });
-      return;
-    } finally {
-      setIsSearching(false);
+      } catch (e) {}
     }
-
-    isFinalEndingPending.current = true;
-
-    sendRealtimeEvent({
-      type: "conversation.item.create",
-      item: {
-        type: "function_call_output",
-        call_id: callId,
-        output: JSON.stringify({
-          status: "sent_to_chat",
-          spoken_message: "답변과 함께 상담은 자동종료됩니다.",
-          chat_answer_id: answerPayload?.id || "error",
-          citation_count: answerPayload?.citations?.length || 0
-        })
-      }
-    });
-
-    sendRealtimeEvent({
-      type: "response.create",
-      response: {
-        instructions:
-          "도구 결과의 spoken_message를 친절하고 명확하게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
-      }
-    });
   }
 
   async function requestPolicyAnswer(question: string, intent?: PolicyIntent, productHint?: string) {
@@ -588,7 +418,7 @@ export function VoiceCounselorApp() {
         product_hint: productHint
       })
     });
-    const payload = (await response.json()) as PolicyAnswer | { error?: string };
+    const payload = (await response.json()) as (PolicyAnswer & { isSimpleChat?: boolean }) | { error?: string };
 
     if (!response.ok || !isPolicyAnswer(payload)) {
       throw new Error("error" in payload && payload.error ? payload.error : "약관 답변 생성에 실패했습니다.");
@@ -638,7 +468,6 @@ export function VoiceCounselorApp() {
 
   function handleStartButtonClick() {
     setHasStartedConsultation(true);
-    // DO NOT start WebRTC automatically here to let user view UI first and grant microphone access via help button
   }
 
   const formatDuration = (sec: number) => {
