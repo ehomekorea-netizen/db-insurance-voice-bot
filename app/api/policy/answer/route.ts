@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import crypto from "crypto";
 import { buildPolicyAnswer, classifyIntent, type PolicyIntent } from "@/lib/policyKnowledge";
+import { correctInsuranceTerms } from "@/lib/koreanFuzzy";
 
 export const runtime = "nodejs";
 
@@ -112,11 +113,18 @@ Output ONLY valid JSON. Do not include markdown code block formatting like \`\`\
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest;
-  const question = body.question?.trim();
+  let question = body.question?.trim();
   const productHint = body.product_hint?.trim();
 
   if (!question) {
     return NextResponse.json({ error: "question is required" }, { status: 400 });
+  }
+
+  // Apply Korean Jamo Fuzzy Corrector to clean up STT typos
+  const originalQuestion = question;
+  question = correctInsuranceTerms(question);
+  if (originalQuestion !== question) {
+    console.log(`[STT Auto-Correct] "${originalQuestion}" -> "${question}"`);
   }
 
   const now = new Date();

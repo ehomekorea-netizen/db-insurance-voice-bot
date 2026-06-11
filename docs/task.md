@@ -33,3 +33,10 @@
   - `[x]` Merge all sources (AnswerBox, PeopleAlsoAsk, Organic) into a structured search context for the LLM.
 - `[x]` 11. Verify compilation using `npm.cmd run build`.
 - `[x]` 12. Commit and push code and documents (implementation plan, walkthrough, task list) to GitHub.
+
+## Phase 4: Korean Jamo Fuzzy Corrector for STT Errors
+- `[x]` 13. Create Korean Jamo decomposition & Levenshtein distance corrector utility in `lib/koreanFuzzy.ts`
+- `[x]` 14. Write and execute test script `lib/test-fuzzy.ts` to verify fuzzy corrector logic
+- `[x]` 15. Integrate fuzzy corrector in `app/api/policy/answer/route.ts`
+- `[x]` 16. Verify full Next.js project compilation using `npm run build`
+- `[x]` 17. Commit and push changes to GitHub
