@@ -528,6 +528,27 @@ export function VoiceCounselorApp() {
       answerPayload = await requestPolicyAnswer(question, args.intent, args.product_hint);
     } catch (err) {
       setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
+      sendRealtimeEvent({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: callId,
+          output: JSON.stringify({
+            status: "error",
+            spoken_message: "죄송합니다. 약관 조회 중 일시적인 오류가 발생했습니다. 다시 말씀해 주시겠어요?",
+            chat_answer_id: "error",
+            citation_count: 0
+          })
+        }
+      });
+      sendRealtimeEvent({
+        type: "response.create",
+        response: {
+          instructions:
+            "도구 결과의 spoken_message를 친절하고 명확하게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
+        }
+      });
+      return;
     } finally {
       setIsSearching(false);
     }

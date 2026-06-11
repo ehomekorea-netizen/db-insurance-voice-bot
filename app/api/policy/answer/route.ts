@@ -84,6 +84,9 @@ export async function POST(request: Request) {
     let searchContext = "";
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const searchResponse = await fetch("https://api.tavily.com/search", {
         method: "POST",
         headers: {
@@ -96,8 +99,11 @@ export async function POST(request: Request) {
           include_raw_content: true,
           include_domains: ["idb.co.kr", "idbins.com", "disclosure.idbins.com", "fss.or.kr", "tistory.com", "naver.com"],
           max_results: 3
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!searchResponse.ok) {
         const errText = await searchResponse.text();
