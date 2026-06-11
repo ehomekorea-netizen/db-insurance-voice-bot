@@ -19,13 +19,17 @@ async function generateSearchQuery(openai: OpenAI, question: string, currentDate
       messages: [
         {
           role: "system",
-          content: `당신은 DB손해보험 설계사(PA)를 지원하기 위한 한국어 보험 약관 RAG 검색 쿼리 최적화기입니다.
+          content: `당신은 DB손해보험 설계사(PA)를 지원하기 위한 한국어 보험 약관 RAG 구글 검색 쿼리 최적화기입니다.
 현재 날짜와 시간 정보: ${currentDate}
-사용자의 질문과 상품 힌트를 분석하여, 공식 상품 공시실 및 보험 규정 검색에 가장 적절한 한글 검색 키워드들을 생성하십시오.
+사용자의 질문과 상품 힌트를 분석하여, 구글 검색(Google Search)에 가장 최적화된 명사 위주의 한글 검색 키워드를 생성하십시오.
 
-[중요: 시간적 지칭어 처리 규칙]
-- 사용자가 '올해', '금년', '이번에', '최근' 등의 표현을 사용한 경우, 현재 날짜인 ${currentDate}를 기준으로 연도를 판단하십시오. 예를 들어 현재가 2026년인 상황에서 '올해 6월 개정'은 '2026년 6월 개정'으로 해석해야 하며, 검색어 키워드에 반드시 해당 구체적인 연도("2026년")를 명시적으로 변환하여 포함시키십시오.
-- '작년', '지난해'는 현재 연도 - 1년으로 매핑하여 검색어를 생성하십시오.
+[시간 지칭어 규칙]
+- 사용자가 '올해', '최근', '이번에' 등을 말하면 현재 연도인 ${currentDate}를 기준으로 삼아 구체적인 연도(예: 2026년)를 검색어에 반드시 명시해 주십시오. (예: '올해 6월 개정' -> '2026년 6월 개정')
+
+[구글 검색 최적화 규칙]
+1. 보험 상품 명칭(예: 참좋은운전자보험, 참좋은훼밀리플러스 등)은 반드시 큰따옴표로 감싸서 구글에서 정확히 매칭되도록 하십시오 (예: "참좋은운전자보험").
+2. 자연어 조사(은, 는, 이, 가, 을, 를, 에, 에서 등)는 최대한 탈락시키고 검색에 유효한 핵심 키워드(명사)만 띄어쓰기로 나열하십시오.
+3. 약관 규정, 면책사항, 서류 등을 묻는 경우 "약관", "면책", "구비서류", "개정" 등의 중요 단어를 명시적으로 포함시키십시오.
 
 [중요: 음성 인식(STT) 오타 및 보험 도메인 용어 교정 규칙]
 사용자의 질문은 음성 인식 과정을 거쳐 유입되므로, 발음이 유사한 오타나 오인식된 단어가 다수 포함되어 있습니다. 당신은 보험 전문가로서 컨텍스트와 의도(Intent)를 파악하여 아래와 같이 올바른 보험 도메인 용어로 반드시 보정한 후 검색 키워드를 생성해야 합니다.
@@ -39,10 +43,9 @@ async function generateSearchQuery(openai: OpenAI, question: string, currentDate
 - 사용자의 가입 시기 단서(예: 2009년, 2017년 등)가 있다면 검색어에 해당 가입 년도와 "과거 약관", "개정전", "표준화이전" 등의 키워드를 적극적으로 병합하십시오.
 
 [출력 규칙]
-1. 오직 공백으로 구분된 한글 검색 키워드들만 출력하십시오.
-2. AND, OR, site: 등 검색 연산자나 큰따옴표를 사용하지 마십시오.
-3. 키워드 목록은 7단어 이내로 간결하게 하십시오.
-4. 반드시 "DB손해보험" 또는 "DB손해"라는 핵심 키워드를 포함시키십시오.`
+1. 오직 공백으로 구분된 한글 검색 키워드들만 출력하십시오. (큰따옴표 외의 특수 기호는 금지)
+2. 키워드 목록은 7단어 이내로 간결하게 하십시오.
+3. 반드시 "DB손해보험" 또는 "DB손해"라는 핵심 키워드를 포함시키십시오.`
         },
         {
           role: "user",
@@ -164,12 +167,22 @@ export async function POST(request: Request) {
     const searchQuery = await generateSearchQuery(openai, question, currentDateString, productHint);
 
     let finalResults: any[] = [];
+    let extraContext = "";
     let usedEngine = "자체 사전지식";
     let searchSuccess = false;
     let searchErrors: string[] = [];
 
+    // Dynamic Query Enrichment: If searching for official rules/deductibles, restrict query to official sites
+    const isOfficialQuery = /약관|개정|보장|지급|제외|면책|한도|서류|기준|운전자|실손|보험료|할인/i.test(question + " " + searchQuery);
+    let serperQuery = searchQuery;
+    if (isOfficialQuery) {
+      serperQuery = `${searchQuery} (site:disclosure.idbins.com OR site:idbins.com OR site:fss.or.kr OR site:knia.or.kr OR site:klia.or.kr)`;
+      console.log(`[공식 사이트 필터 적용] 구글 검색 쿼리: ${serperQuery}`);
+    } else {
+      console.log(`[일반 웹 검색 적용] 구글 검색 쿼리: ${serperQuery}`);
+    }
+
     // Try Google Search via Serper.dev
-    console.log(`Google Serper Search 실행 (최적화): ${searchQuery}`);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
@@ -181,7 +194,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          q: searchQuery,
+          q: serperQuery,
           gl: "kr",
           hl: "ko",
           num: 4
@@ -197,18 +210,62 @@ export async function POST(request: Request) {
       }
 
       const data = await response.json();
-      const results = data.organic || [];
+      const organicResults = data.organic || [];
+      const answerBox = data.answerBox;
+      const peopleAlsoAsk = data.peopleAlsoAsk || [];
 
-      if (results.length > 0) {
-        finalResults = results.map((r: any) => ({
+      let parsedResults: any[] = [];
+
+      // 1. Capture Google AnswerBox (Featured Snippet)
+      if (answerBox) {
+        const abContent = answerBox.answer || answerBox.snippet || "";
+        if (abContent) {
+          console.log("구글 AnswerBox 요약 데이터 감지됨");
+          extraContext += `[구글 추천 답변 (AnswerBox)]\n제목: ${answerBox.title || "구글 공식 추천 요약"}\n출처 주소: ${answerBox.link || ""}\n내용: ${abContent}\n\n`;
+          parsedResults.push({
+            title: `[추천답변] ${answerBox.title || "구글 공식 요약"}`,
+            url: answerBox.link || "",
+            content: abContent,
+            raw_content: abContent
+          });
+        }
+      }
+
+      // 2. Capture Google PeopleAlsoAsk (Related Q&A)
+      if (peopleAlsoAsk.length > 0) {
+        const paaItems = peopleAlsoAsk.slice(0, 2);
+        console.log(`구글 연관 Q&A 감지됨: ${paaItems.length}개`);
+        extraContext += `[연관 Q&A (People Also Ask)]\n`;
+        paaItems.forEach((paa: any, idx: number) => {
+          const paaContent = paa.snippet || paa.answer || "";
+          if (paaContent) {
+            extraContext += `질문 ${idx + 1}: ${paa.question}\n답변: ${paaContent}\n출처 주소: ${paa.link || ""}\n\n`;
+            parsedResults.push({
+              title: `[연관질문] ${paa.question}`,
+              url: paa.link || "",
+              content: paaContent,
+              raw_content: paaContent
+            });
+          }
+        });
+      }
+
+      // 3. Capture Organic Results
+      if (organicResults.length > 0) {
+        const organicMapped = organicResults.slice(0, 4).map((r: any) => ({
           title: r.title || "참고자료",
           url: r.link || "",
           content: r.snippet || "",
           raw_content: r.snippet || ""
         }));
+        parsedResults.push(...organicMapped);
+      }
+
+      if (parsedResults.length > 0) {
+        finalResults = parsedResults.slice(0, 5); // Keep top 5 results for citation links
         usedEngine = "Google (Serper)";
         searchSuccess = true;
-        console.log(`Google Serper Search 성공: ${finalResults.length}개 결과`);
+        console.log(`Google Serper Search 성공: 총 ${finalResults.length}개 컨텍스트 구축 완료`);
       } else {
         console.log("Google Serper Search 결과 없음");
       }
@@ -220,12 +277,16 @@ export async function POST(request: Request) {
 
     let searchContext = "";
     if (searchSuccess && finalResults.length > 0) {
-      searchContext = finalResults.map((r: any, i: number) => {
+      const organicContext = finalResults.map((r: any, i: number) => {
         return `[검색 자료 ${i + 1}]
 제목: ${r.title}
 출처 주소: ${r.url}
 내용: ${r.content}`;
       }).join("\n\n");
+
+      searchContext = extraContext 
+        ? `${extraContext}---\n\n${organicContext}`
+        : organicContext;
     } else {
       usedEngine = searchErrors.length > 0
         ? `자체 사전지식 (${searchErrors.join(", ")})`
