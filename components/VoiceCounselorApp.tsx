@@ -69,6 +69,7 @@ export function VoiceCounselorApp() {
   const processedCallIdsRef = useRef<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const optimisticMessageIdRef = useRef<string | null>(null);
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -281,13 +282,27 @@ export function VoiceCounselorApp() {
       setMicMuted(false);
     }
 
-    // Mute mic when AI response is created (begins generation/playback)
+    // Mute mic and create optimistic user bubble when AI response is created (begins generation/playback)
     if (event.type === "response.created") {
       if (unmuteTimeoutRef.current) {
         clearTimeout(unmuteTimeoutRef.current);
         unmuteTimeoutRef.current = null;
       }
       setMicMuted(true);
+
+      const optimisticId = `optimistic-${Date.now()}`;
+      optimisticMessageIdRef.current = optimisticId;
+      setMessages((current) => {
+        const lastMsg = current[current.length - 1];
+        if (lastMsg && lastMsg.role === "user") {
+          optimisticMessageIdRef.current = null;
+          return current;
+        }
+        return [
+          ...current,
+          { id: optimisticId, role: "user", content: "음성 인식 중..." }
+        ];
+      });
     }
 
     // Assistant speech: live delta
@@ -307,7 +322,7 @@ export function VoiceCounselorApp() {
       setLiveTranscript("");
     }
 
-    // Response done: unmute mic after a brief delay to avoid speaker tail echo
+    // Response done: unmute mic and cleanup unresolved optimistic user bubble
     if (event.type === "response.done") {
       if (unmuteTimeoutRef.current) {
         clearTimeout(unmuteTimeoutRef.current);
@@ -316,6 +331,21 @@ export function VoiceCounselorApp() {
         setMicMuted(false);
         unmuteTimeoutRef.current = null;
       }, 1000);
+
+      // Delayed cleanup for unresolved "음성 인식 중..." bubble
+      setTimeout(() => {
+        setMessages((current) => {
+          const optimisticId = optimisticMessageIdRef.current;
+          if (optimisticId) {
+            const msg = current.find((m) => m.id === optimisticId);
+            if (msg && msg.content === "음성 인식 중...") {
+              optimisticMessageIdRef.current = null;
+              return current.filter((m) => m.id !== optimisticId);
+            }
+          }
+          return current;
+        });
+      }, 1500);
     }
 
     // User speech: live delta (real-time as user speaks)
@@ -323,10 +353,27 @@ export function VoiceCounselorApp() {
       setUserLiveTranscript((current) => `${current}${event.delta}`);
     }
 
-    // User speech: completed transcription
+    // User speech: completed transcription - map to optimistic bubble
     if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
       setUserLiveTranscript("");
-      addMessage({ role: "user", content: event.transcript });
+      const transcriptText = event.transcript.trim();
+      if (transcriptText) {
+        setMessages((current) => {
+          const optimisticId = optimisticMessageIdRef.current;
+          if (optimisticId && current.some((m) => m.id === optimisticId)) {
+            optimisticMessageIdRef.current = null;
+            return current.map((m) =>
+              m.id === optimisticId ? { ...m, content: transcriptText } : m
+            );
+          } else {
+            const hasExisting = current.some(
+              (m) => m.role === "user" && m.content === transcriptText
+            );
+            if (hasExisting) return current;
+            return [...current, { id: `user-${Date.now()}`, role: "user", content: transcriptText }];
+          }
+        });
+      }
     }
 
     if (
@@ -485,6 +532,9 @@ export function VoiceCounselorApp() {
   };
 
   function handleCopyText(msgId: string, question: string, ans: PolicyAnswer) {
+    const analysisText = ans.analysis
+      ? `🔍 질문 이해 및 분석 근거:\n${ans.analysis}\n\n`
+      : "";
     const conditionsText = ans.conditions && ans.conditions.length > 0
       ? `\n\n✅ 보장 대상 및 지급 조건:\n${ans.conditions.map((c) => `- ${c}`).join("\n")}`
       : "";
@@ -495,7 +545,7 @@ export function VoiceCounselorApp() {
       ? `\n\n📋 정확한 확인을 위해 필요한 정보:\n${ans.requiredInfo.map((i) => `- ${i}`).join("\n")}`
       : "";
 
-    const copyText = `💡 핵심 요약:
+    const copyText = `${analysisText}💡 핵심 요약:
 ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 
 ---
@@ -579,7 +629,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               )}
               <div className="bubble-wrapper">
                 {message.role === "assistant" && <span className="sender-name">프로미</span>}
-                {message.role === "user" && <span className="sender-name">나 (설계사)</span>}
+                {message.role === "user" && <span className="sender-name">나</span>}
                 <MessageBubble
                   message={message}
                   copiedId={copiedId}
@@ -683,6 +733,13 @@ function MessageBubble({
           </button>
         </div>
 
+        {ans.analysis && (
+          <div className="answer-section">
+            <h4 className="section-title analysis-style">🔍 질문 이해 및 분석 근거</h4>
+            <p className="analysis-text" style={{ whiteSpace: "pre-line" }}>{ans.analysis}</p>
+          </div>
+        )}
+
         {ans.summary && (
           <div className="answer-section">
             <h4 className="section-title summary-style">💡 핵심 요약</h4>
@@ -736,10 +793,10 @@ function MessageBubble({
                   key={citation.id}
                 >
                   <div className="citation-header">
-                    <span className="citation-name">{citation.title}</span>
+                    <span className="citation-name">{safeDecodeURIComponent(citation.title)}</span>
                     <span className="citation-section">{citation.section}</span>
                   </div>
-                  {citation.excerpt && <p className="citation-excerpt">"{citation.excerpt}"</p>}
+                  {citation.excerpt && <p className="citation-excerpt">"{safeDecodeURIComponent(citation.excerpt)}"</p>}
                   <div className="citation-footer">
                     <span className="citation-ver">{citation.version}</span>
                     <span className="citation-link-action">공식 홈 바로가기 ↗</span>
@@ -779,6 +836,14 @@ function safeJsonParse<T>(value: string): T | null {
     return JSON.parse(value) as T;
   } catch {
     return null;
+  }
+}
+
+function safeDecodeURIComponent(val: string): string {
+  try {
+    return decodeURIComponent(val);
+  } catch {
+    return val;
   }
 }
 

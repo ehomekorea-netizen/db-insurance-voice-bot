@@ -22,6 +22,7 @@ export type PolicyAnswer = {
   id: string;
   question: string;
   intent: PolicyIntent;
+  analysis?: string;
   summary: string;
   conditions: string[];
   cautions: string[];

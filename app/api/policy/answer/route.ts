@@ -10,6 +10,40 @@ type PolicyAnswerRequest = {
   product_hint?: string;
 };
 
+// Preprocess conversational user question into optimized Korean search keywords
+async function generateSearchQuery(openai: OpenAI, question: string, productHint?: string): Promise<string> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a search query optimizer for Korean insurance policies.
+Analyze the user's question and product hint. Extract the key product name, coverage details, and terms.
+Generate a search query consisting of space-separated keywords that will find official Korean insurance policies on the web.
+Rules:
+1. Output ONLY the optimized search keywords in Korean, separated by spaces.
+2. Do NOT use search operators like AND, OR, site:, or quotes.
+3. Keep the query under 5 words.
+4. Always prefix the query with "DB손해보험".
+5. Do NOT include any conversational text.`
+        },
+        {
+          role: "user",
+          content: `질문: "${question}"\n상품정보: "${productHint || "없음"}"`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 50
+    });
+    return response.choices[0].message?.content?.trim() || `DB손해보험 ${productHint || ""} ${question}`;
+  } catch (err) {
+    console.error("OpenAI search query generation failed, using fallback:", err);
+    const cleanQuestion = question.replace(/["']/g, "");
+    return `DB손해보험 ${productHint || ""} ${cleanQuestion}`;
+  }
+}
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest;
   const question = body.question?.trim();
@@ -22,7 +56,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   const tavilyApiKey = process.env.TAVILY_API_KEY;
 
-  // FALLBACK: If OpenAI Key or Tavily API Key is not configured, fallback to local MVP mock database
+  // FALLBACK: If API Keys are not configured, fallback to local sample data
   if (!apiKey || !tavilyApiKey) {
     console.warn("경고: OPENAI_API_KEY 또는 TAVILY_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
     const fallbackAnswer = buildPolicyAnswer({
@@ -34,12 +68,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Build a highly targeted search query for DB Insurance Public Disclosure Room
-    // Search both "판매상품" (Active) and "판매중지 상품" (Discontinued)
-    const productQueryTerm = productHint ? `"${productHint}"` : "";
-    const searchQuery = `site:disclosure.idbins.com (판매상품 OR "판매중지 상품") ${productQueryTerm} "${question}" 약관`;
+    const openai = new OpenAI({ apiKey });
 
-    console.log(`Tavily 검색 실행: ${searchQuery}`);
+    // 1. Optimize search query to get clean Korean terms instead of conversational sentence
+    const searchQuery = await generateSearchQuery(openai, question, productHint);
+    console.log(`Tavily 검색 실행 (최적화): ${searchQuery}`);
 
     const searchResponse = await fetch("https://api.tavily.com/search", {
       method: "POST",
@@ -50,7 +83,7 @@ export async function POST(request: Request) {
         api_key: tavilyApiKey,
         query: searchQuery,
         search_depth: "advanced",
-        include_domains: ["idbins.com"],
+        include_domains: ["idbins.com", "disclosure.idbins.com", "naver.com"],
         max_results: 5
       })
     });
@@ -63,17 +96,25 @@ export async function POST(request: Request) {
     const searchData = await searchResponse.json();
     const results = searchData.results || [];
 
-    // 2. Strict Ingestion Filtering: Remove generic/useless FAQ or help URLs
+    // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
     const filteredResults = results.filter((r: any) => {
       const url = (r.url || "").toLowerCase();
-      // Filter out customer service main, FAQ pages, index pages, help pages
+      const title = (r.title || "").toLowerCase();
+      // Filter out customer service main, FAQ pages, help pages, English pages, and IR files
       if (
         url.includes("/faq") ||
         url.includes("/customer") ||
         url.includes("/main") ||
         url.includes("/index") ||
         url.includes("faqdetail") ||
-        url.includes("/qna")
+        url.includes("/qna") ||
+        url.includes("/eng/") ||
+        url.includes("/en/") ||
+        url.includes("corporate") ||
+        url.includes("ir-") ||
+        url.includes("growth-stage") ||
+        title.includes("annual report") ||
+        title.includes("investor")
       ) {
         return false;
       }
@@ -95,9 +136,7 @@ export async function POST(request: Request) {
       searchContext = "DB손해보험 상품공시실에서 해당 조건의 구체적인 약관 원문 조항을 찾지 못했습니다.";
     }
 
-    // 3. Query OpenAI gpt-4o-mini (Cost-efficient Model)
-    const openai = new OpenAI({ apiKey });
-    
+    // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
     const chatCompletion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -116,8 +155,10 @@ export async function POST(request: Request) {
 반드시 아래의 [응답 형식]을 엄격하게 준수하여 대괄호 제목과 줄바꿈을 활용하십시오.
 
 [응답 형식]
+[분석 배경 및 이해]
+- 사용자의 질문을 설계사 관점에서 어떻게 이해했는지 분석 맥락을 한글로 정리하고, 상품공시 및 보험 지식 검색 결과에서 어떤 논리적 근거(상품 출시일, 가입년도 매핑 등)를 활용하여 판정했는지 구체적인 근거를 명확하게 서술하십시오.
 [요약]
-검색 결과에 따른 핵심 보장 및 면책 여부 요약 (2~3문장).
+- 질문에 대한 핵심 팩트 중심의 2~3문장 결론 요약.
 [조건]
 - 보장이 지급되기 위해 만족해야 하는 명확한 약관상 조건들을 기재하십시오 (예: 사고 구분, 치료 항목, 지급 비율 등).
 - 찾지 못했다면 이 항목을 생략하십시오.
@@ -138,18 +179,25 @@ ${searchContext}`
     const responseText = chatCompletion.choices[0].message?.content || "";
 
     // 4. Robust parsing of the reasoning response
+    let analysis = "";
     let summary = "";
     let conditions: string[] = [];
     let cautions: string[] = [];
 
+    const analysisStart = responseText.indexOf("[분석 배경 및 이해]");
     const summaryStart = responseText.indexOf("[요약]");
     const conditionsStart = responseText.indexOf("[조건]");
     const cautionsStart = responseText.indexOf("[주의사항]");
 
+    if (analysisStart !== -1) {
+      const end = summaryStart !== -1 ? summaryStart : (conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : responseText.length));
+      analysis = responseText.substring(analysisStart + 12, end).trim();
+    }
+
     if (summaryStart !== -1) {
       const end = conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : responseText.length);
       summary = responseText.substring(summaryStart + 4, end).trim();
-    } else {
+    } else if (analysisStart === -1) {
       summary = responseText;
     }
 
@@ -164,19 +212,8 @@ ${searchContext}`
       cautions = rawCautions.split("\n").map(l => l.replace(/^-\s*/, "").trim()).filter(Boolean);
     }
 
-    // 5. Generate high-quality citations, excluding any generic FAQ pages
+    // 5. Generate high-quality citations
     const citations = finalResults
-      .filter((r: any) => {
-        // Double check: do not export FAQ links as citations
-        const url = (r.url || "").toLowerCase();
-        return !(
-          url.includes("/faq") ||
-          url.includes("/customer") ||
-          url.includes("/main") ||
-          url.includes("/index") ||
-          url.includes("faqdetail")
-        );
-      })
       .map((r: any, i: number) => ({
         id: `citation-${i + 1}-${r.url ? crypto.randomUUID().substring(0, 8) : "unknown"}`,
         title: r.title || "DB손해보험 공식 공시실",
@@ -191,6 +228,7 @@ ${searchContext}`
       id: crypto.randomUUID(),
       question,
       intent: body.intent ?? classifyIntent(question),
+      analysis,
       summary,
       conditions,
       cautions,
@@ -204,7 +242,7 @@ ${searchContext}`
     });
 
   } catch (err: any) {
-    console.error("o3-mini RAG API 실행 중 에러 발생:", err);
+    console.error("RAG API 실행 중 에러 발생:", err);
     return NextResponse.json(
       { error: "RAG 실행 오류", detail: err.message || err },
       { status: 500 }
