@@ -41,21 +41,18 @@ export async function POST(request: Request) {
     // 1. Create an ephemeral Assistant configured with File Search
     assistant = await openai.beta.assistants.create({
       name: "DB손해보험 MVP 약관 상담 RAG",
-      instructions: (
-        "당신은 DB손해보험 약관에 대해 정확하게 상담해주는 AI 상담원입니다. "
-        "제공된 파일 검색(File Search) 약관 문서 결과를 철저히 탐색하여 고객의 질문에 대답하십시오. "
-        "답변할 때는 반드시 아래의 [응답 형식]을 엄격하게 준수해야 합니다. "
-        "대괄호 제목과 구분 기호(줄바꿈 등)를 정확하게 출력하십시오.\n\n"
-        "[응답 형식]\n"
-        "[요약]\n"
-        "질문에 대한 전반적인 RAG 요약 답변 (2~3문장).\n"
-        "[조건]\n"
-        "- 주요 보장 지급 조건 또는 해당 조건 1\n"
-        "- 주요 보장 지급 조건 또는 해당 조건 2\n"
-        "[주의사항]\n"
-        "- 면책 조항, 한도, 유의해야 할 사항 1\n"
-        "- 면책 조항, 한도, 유의해야 할 사항 2"
-      ),
+      instructions: `당신은 DB손해보험 약관에 대해 정확하게 상담해주는 AI 상담원입니다. 제공된 파일 검색(File Search) 약관 문서 결과를 철저히 탐색하여 고객의 질문에 대답하십시오. 답변할 때는 반드시 아래의 [응답 형식]을 엄격하게 준수해야 합니다. 대괄호 제목과 구분 기호(줄바꿈 등)를 정확하게 출력하십시오.
+
+[응답 형식]
+[요약]
+질문에 대한 전반적인 RAG 요약 답변 (2~3문장).
+[조건]
+- 주요 보장 지급 조건 또는 해당 조건 1
+- 주요 보장 지급 조건 또는 해당 조건 2
+[주의사항]
+- 면책 조항, 한도, 유의해야 할 사항 1
+- 면책 조항, 한도, 유의해야 할 사항 2`,
+
       model: "gpt-4o-mini", // Fast and cost-efficient
       tools: [{ type: "file_search" }]
     });
