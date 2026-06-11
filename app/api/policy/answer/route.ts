@@ -95,12 +95,11 @@ export async function POST(request: Request) {
       searchContext = "DB손해보험 상품공시실에서 해당 조건의 구체적인 약관 원문 조항을 찾지 못했습니다.";
     }
 
-    // 3. Query OpenAI o3-mini (Reasoning Model)
+    // 3. Query OpenAI gpt-4o-mini (Cost-efficient Model)
     const openai = new OpenAI({ apiKey });
     
-    // NOTE: o3-mini does not support "temperature" parameter. We omit it.
     const chatCompletion = await openai.chat.completions.create({
-      model: "o3-mini",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",

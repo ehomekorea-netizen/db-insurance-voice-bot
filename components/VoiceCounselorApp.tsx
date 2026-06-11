@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
 import type { PolicyAnswer, PolicyIntent } from "@/lib/policyKnowledge";
 
 type ChatMessage =
@@ -33,20 +33,21 @@ const EXAMPLE_QUESTIONS = [
 ];
 
 export function VoiceCounselorApp() {
+  const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [activeTab, setActiveTab] = useState<"voice" | "chat">("voice");
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "system",
       content:
-        "안녕하세요. DB손해보험 AI 보험 상담원입니다. 대화를 통해 약관 및 보장 내역을 문의하시거나 하단 채팅을 이용해보세요."
+        "안녕하세요! DB손해보험 AI 보이스 상담원 프로미입니다. 실시간 음성 통화 및 대화를 통해 공식 약관을 확인해 보세요."
     }
   ]);
 
@@ -55,16 +56,52 @@ export function VoiceCounselorApp() {
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const processedCallIdsRef = useRef<Set<string>>(new Set());
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const statusLabel = useMemo(() => {
-    if (isConnecting) return "AI 상담원 호출 중...";
-    if (isConnected) return "상담 연결 완료 (음성)";
-    return "연결 대기 중";
+    if (isConnecting) return "프로미 호출 중...";
+    if (isConnected) return "실시간 음성 연결됨";
+    return "음성 대기 중";
   }, [isConnecting, isConnected]);
+
+  // Reset inactivity timer (3 minutes auto-disconnect)
+  const resetInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
+      console.log("3분간 활동이 없어 음성 세션을 자동 차단합니다.");
+      stopRealtime();
+    }, 3 * 60 * 1000);
+  };
+
+  // Monitor visibility state to disconnect WebRTC in background
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        console.log("PWA 백그라운드 전환으로 음성 세션을 자동 종료합니다.");
+        stopRealtime();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, liveTranscript, isSearching]);
 
   async function startRealtime() {
     setError(null);
     setIsConnecting(true);
+    resetInactivityTimer();
 
     try {
       const tokenResponse = await fetch("/api/realtime/token", { method: "POST" });
@@ -104,11 +141,14 @@ export function VoiceCounselorApp() {
           type: "response.create",
           response: {
             instructions:
-              "사용자에게 한국어로 짧게 인사하고, 약관 질문을 말해달라고 안내하세요. 한 문장으로만 말하세요."
+              "사용자에게 프로미 아바타로서 친근하고 정중하게 한국어로 인사하고, 궁금하신 DB손해보험 상품명이나 약관 질문을 말씀해달라고 간결하게 안내하세요. 한 문장으로만 첫 인사를 말하세요."
           }
         });
       };
-      dc.onmessage = (event) => handleRealtimeEvent(event.data);
+      dc.onmessage = (event) => {
+        resetInactivityTimer();
+        handleRealtimeEvent(event.data);
+      };
       dc.onerror = () => setError("Realtime data channel 오류가 발생했습니다.");
       dc.onclose = () => setIsConnected(false);
 
@@ -153,6 +193,9 @@ export function VoiceCounselorApp() {
     processedCallIdsRef.current.clear();
     setIsConnected(false);
     setIsConnecting(false);
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
   }
 
   function sendRealtimeEvent(payload: unknown) {
@@ -171,7 +214,14 @@ export function VoiceCounselorApp() {
     }
 
     if (event.type === "response.output_audio_transcript.done") {
-      setLiveTranscript("");
+      // Append finalized speech text as a message bubble
+      setLiveTranscript((finalText) => {
+        const cleaned = finalText.trim();
+        if (cleaned) {
+          addMessage({ role: "assistant", content: cleaned });
+        }
+        return "";
+      });
     }
 
     if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
@@ -194,7 +244,7 @@ export function VoiceCounselorApp() {
     const args = safeJsonParse<{ question?: string; intent?: PolicyIntent; product_hint?: string }>(rawArguments) ?? {};
     const question = args.question?.trim() || "사용자 약관 질문";
 
-    // Deduplicate user bubble: if transcription event already added it, don't duplicate.
+    // Deduplicate user bubble
     setMessages((current) => {
       const lastMsg = current[current.length - 1];
       if (
@@ -214,7 +264,16 @@ export function VoiceCounselorApp() {
       ];
     });
 
-    const answer = await requestPolicyAnswer(question, args.intent, args.product_hint);
+    setIsSearching(true);
+    let answerPayload: PolicyAnswer | null = null;
+
+    try {
+      answerPayload = await requestPolicyAnswer(question, args.intent, args.product_hint);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
+    } finally {
+      setIsSearching(false);
+    }
 
     sendRealtimeEvent({
       type: "conversation.item.create",
@@ -223,9 +282,9 @@ export function VoiceCounselorApp() {
         call_id: callId,
         output: JSON.stringify({
           status: "sent_to_chat",
-          spoken_message: "상세 약관 확인 결과는 하단 채팅 화면에 전송해드렸습니다. 확인해 보세요.",
-          chat_answer_id: answer.id,
-          citation_count: answer.citations.length
+          spoken_message: "요청하신 상세 약관 리포트 조회를 마쳤습니다. 대화창에 분석 결과를 전송해드렸습니다.",
+          chat_answer_id: answerPayload?.id || "error",
+          citation_count: answerPayload?.citations?.length || 0
         })
       }
     });
@@ -234,7 +293,7 @@ export function VoiceCounselorApp() {
       type: "response.create",
       response: {
         instructions:
-          "도구 결과의 spoken_message만 한국어로 짧게 말하세요. 약관의 긴 조항이나 리스트는 절대로 말하지 마세요."
+          "도구 결과의 spoken_message만 한국어로 짧게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
       }
     });
   }
@@ -261,6 +320,9 @@ export function VoiceCounselorApp() {
       answer: payload
     });
 
+    // Auto-disconnect voice session to save costs after rendering the RAG report
+    stopRealtime();
+
     return payload;
   }
 
@@ -273,10 +335,13 @@ export function VoiceCounselorApp() {
     setError(null);
     addMessage({ role: "user", content: question });
 
+    setIsSearching(true);
     try {
       await requestPolicyAnswer(question);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "답변 생성에 실패했습니다.");
+    } finally {
+      setIsSearching(false);
     }
   }
 
@@ -288,160 +353,210 @@ export function VoiceCounselorApp() {
         ...message
       } as ChatMessage
     ]);
-
-    // Switch check and unread count
-    if (message.role === "assistant" && activeTab !== "chat") {
-      setUnreadCount((prev) => prev + 1);
-    }
   }
 
-  function handleTabChange(tab: "voice" | "chat") {
-    setActiveTab(tab);
-    if (tab === "chat") {
-      setUnreadCount(0);
-    }
+  function handleStartButtonClick() {
+    setHasStartedConsultation(true);
+    void startRealtime();
   }
 
+  function handleCopyText(msgId: string, question: string, ans: PolicyAnswer) {
+    const conditionsText = ans.conditions && ans.conditions.length > 0
+      ? `\n\n✅ 보장 대상 및 지급 조건:\n${ans.conditions.map((c) => `- ${c}`).join("\n")}`
+      : "";
+    const cautionsText = ans.cautions && ans.cautions.length > 0
+      ? `\n\n⚠️ 보장 제외 및 유의사항 (면책):\n${ans.cautions.map((c) => `- ${c}`).join("\n")}`
+      : "";
+    const requiredInfoText = ans.requiredInfo && ans.requiredInfo.length > 0
+      ? `\n\n📋 정확한 확인을 위해 필요한 정보:\n${ans.requiredInfo.map((i) => `- ${i}`).join("\n")}`
+      : "";
+    const citationsText = ans.citations && ans.citations.length > 0
+      ? `\n\n🔗 공식 출처 및 공시자료:\n${ans.citations.map((c) => `- ${c.title} (${c.sourceUrl})`).join("\n")}`
+      : "";
+
+    const copyText = `[DB손해보험 약관 RAG 분석 리포트]
+질문: ${question}
+
+💡 핵심 요약:
+${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText}
+
+---
+* ${ans.disclaimer || "본 답변은 공식 공시자료 검색 기반 참고용이며, 최종 심사 결과와 다를 수 있습니다."}`;
+
+    navigator.clipboard.writeText(copyText).then(() => {
+      setCopiedId(msgId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }
+
+  // Cover Screen / Intro
+  if (!hasStartedConsultation) {
+    return (
+      <main className="cover-shell">
+        <div className="cover-card">
+          <div className="promy-avatar-lg">
+            <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
+          </div>
+          <h1 className="cover-title">프로미 AI 보이스 상담봇</h1>
+          <p className="cover-description">
+            DB손해보험 공식 공시실(판매/판매중지 상품) 검색 RAG 시스템.<br />
+            실시간 음성과 챗봇 통합 환경으로 빠르고 정확한 약관 조항을 조회합니다.
+          </p>
+          <button className="primary-button start-consult-btn" onClick={handleStartButtonClick}>
+            프로미와 상담 시작하기 💬
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // Main Unified Messenger UI
   return (
-    <main className="app-shell">
-      <header className="top-bar">
-        <div className="brand">
-          <div className="brand-mark">DB</div>
+    <main className="messenger-shell">
+      {/* Header */}
+      <header className="messenger-header">
+        <div className="messenger-brand">
+          <img src="/promy.png" alt="PROMY" className="avatar-img" />
           <div>
-            <h1>DB손해보험 AI 보이스 상담원</h1>
-            <p className="subtitle">공식 공시실 기반 스마트 약관 RAG 검색 서비스</p>
+            <h2>프로미 AI 상담원</h2>
+            <span className={`messenger-status ${isConnected ? "online" : ""}`}>
+              {statusLabel}
+            </span>
           </div>
         </div>
-        <div className={`status-pill ${isConnected ? "connected" : ""} ${isConnecting ? "connecting" : ""}`}>
-          <span className="status-dot" />
-          {statusLabel}
+        <div className="messenger-header-actions">
+          {!isConnected && !isConnecting ? (
+            <button className="primary-button call-btn-sm" onClick={startRealtime}>
+              <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27 11.72 11.72 0 003.74.6 1 1 0 011 1v3.5a1 1 0 01-1 1A16 16 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.72 11.72 0 00.6 3.74 1 1 0 01-.27 1.1l-2.2 2.2z" />
+              </svg>
+              음성 상담 연결
+            </button>
+          ) : (
+            <button className="danger-button call-btn-sm" onClick={stopRealtime} disabled={isConnecting}>
+              <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 11h3v2h-3v3h-2v-3H8v-2h3V8h2v5z" transform="rotate(45 12 12)" />
+              </svg>
+              음성 연결 종료
+            </button>
+          )}
         </div>
       </header>
 
-      <section className="workspace">
-        {/* LEFT: VOICE VIEW */}
-        <aside className={`panel voice-panel ${activeTab === "voice" ? "active" : ""}`}>
-          <div className="voice-stage">
-            <div className="orb-container">
-              <div className={`orb-glow ${isConnected ? "active" : ""}`} />
-              <div className={`orb-ring ring-1 ${isConnected ? "active" : ""}`} />
-              <div className={`orb-ring ring-2 ${isConnected ? "active" : ""}`} />
-              <div className={`orb ${isConnected ? "listening" : ""} ${isConnecting ? "connecting" : ""}`} aria-hidden="true">
-                <div className="orb-inner" />
+      {/* Messages */}
+      <section className="messenger-chat-area">
+        {messages.map((message) => (
+          <div key={message.id} className="message-wrapper">
+            {message.role === "assistant" && (
+              <div className="avatar-wrapper">
+                <img src="/promy.png" alt="PROMY" className="avatar-img" />
+              </div>
+            )}
+            <div className="bubble-wrapper">
+              {message.role === "assistant" && <span className="sender-name">프로미</span>}
+              <MessageBubble
+                message={message}
+                copiedId={copiedId}
+                onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
+              />
+            </div>
+          </div>
+        ))}
+
+        {/* Live speech transcript (Typing bubble) */}
+        {liveTranscript && (
+          <div className="message-wrapper">
+            <div className="avatar-wrapper">
+              <img src="/promy.png" alt="PROMY" className="avatar-img" />
+            </div>
+            <div className="bubble-wrapper">
+              <span className="sender-name">프로미 (말하는 중)</span>
+              <div className="message assistant-bubble live-typing-bubble">
+                <span className="live-transcript-tag">🎙️ 실시간 음성</span>
+                <p>{liveTranscript}</p>
               </div>
             </div>
-            <div className="stage-caption">
-              <h2>{isConnected ? "음성 상담 진행 중" : isConnecting ? "연결 요청 중" : "AI 상담 시작하기"}</h2>
-              <p>
-                {isConnected 
-                  ? "보험 약관에 대해 궁금한 점을 자연스럽게 말씀해보세요." 
-                  : "음성 연결을 누르시면 마이크를 통해 대화를 시작할 수 있습니다."}
-              </p>
+          </div>
+        )}
+
+        {/* Searching Loader Card */}
+        {isSearching && (
+          <div className="message-wrapper">
+            <div className="avatar-wrapper">
+              <img src="/promy.png" alt="PROMY" className="avatar-img" />
+            </div>
+            <div className="bubble-wrapper">
+              <span className="sender-name">프로미</span>
+              <div className="message assistant-bubble loader-bubble">
+                <div className="loader-card-content">
+                  <div className="loader-spinner">
+                    <span className="dot dot-1" />
+                    <span className="dot dot-2" />
+                    <span className="dot dot-3" />
+                  </div>
+                  <p>프로미가 DB손해보험 상품공시실에서 관련 약관을 조회하는 중입니다...</p>
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="controls">
-            {!isConnected && !isConnecting ? (
-              <button className="primary-button call-btn" onClick={startRealtime}>
-                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27 11.72 11.72 0 003.74.6 1 1 0 011 1v3.5a1 1 0 01-1 1A16 16 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.72 11.72 0 00.6 3.74 1 1 0 01-.27 1.1l-2.2 2.2z" />
-                </svg>
-                상담원 연결
-              </button>
-            ) : (
-              <button className="danger-button hangup-btn" onClick={stopRealtime} disabled={isConnecting}>
-                <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 11h3v2h-3v3h-2v-3H8v-2h3V8h2v5z" transform="rotate(45 12 12)" />
-                </svg>
-                상담 종료
-              </button>
-            )}
+        {error && (
+          <div className="system-error-wrapper">
+            <div className="toast-error">{error}</div>
           </div>
+        )}
 
-          {liveTranscript && (
-            <div className="live-transcript-bubble">
-              <span className="speaker-tag">AI 상담원</span>
-              <p className="transcript-text">{liveTranscript}</p>
-            </div>
-          )}
-
-          {error && <div className="toast-error">{error}</div>}
-
-          <div className="quick-guide">
-            <h3>💡 음성 질문 예시</h3>
-            <ul>
-              {EXAMPLE_QUESTIONS.map((q, idx) => (
-                <li key={idx} onClick={() => setInput(q)} className="guide-item">
-                  "{q}"
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-
-        {/* RIGHT: CHAT VIEW */}
-        <section className={`panel chat-panel ${activeTab === "chat" ? "active" : ""}`}>
-          <div className="chat-header">
-            <h2>상세 약관 리포트</h2>
-            <p>공식 웹사이트 검색에 기반한 정확한 보장 조건과 출처 조항을 한 눈에 확인합니다.</p>
-          </div>
-
-          <div className="messages-area">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-          </div>
-
-          <form className="composer" onSubmit={submitTextQuestion}>
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="약관이나 가입 조건을 여기에 텍스트로 물어보세요..."
-              aria-label="약관 질문"
-            />
-            <button className="secondary-button" type="submit" disabled={!input.trim()}>
-              전송
-            </button>
-          </form>
-        </section>
+        <div ref={messagesEndRef} />
       </section>
 
-      {/* MOBILE BOTTOM NAV BAR */}
-      <nav className="bottom-nav">
-        <button
-          className={`nav-item ${activeTab === "voice" ? "active" : ""}`}
-          onClick={() => handleTabChange("voice")}
-        >
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3z" />
-          </svg>
-          <span>음성 상담</span>
-        </button>
-        <button
-          className={`nav-item ${activeTab === "chat" ? "active" : ""}`}
-          onClick={() => handleTabChange("chat")}
-        >
-          <div className="chat-badge-wrapper">
-            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.12 2.9 2.78 2.9h12.94c1.66 0 2.78-1.3 2.78-2.9V6.49c0-1.6-1.12-2.9-2.78-2.9H3.47c-1.66 0-2.78 1.3-2.78 2.9v9.26z" />
-            </svg>
-            {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+      {/* Guide & Composer */}
+      <footer className="messenger-footer-area">
+        {messages.length <= 2 && (
+          <div className="chat-quick-guide">
+            {EXAMPLE_QUESTIONS.map((q, idx) => (
+              <button key={idx} onClick={() => setInput(q)} className="guide-chip">
+                "{q}"
+              </button>
+            ))}
           </div>
-          <span>상세 답변</span>
-        </button>
-      </nav>
+        )}
+        <form className="composer-form" onSubmit={submitTextQuestion}>
+          <input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder={isConnected ? "마이크로 직접 질문하시거나 여기에 질문을 입력하세요..." : "질문을 입력하세요..."}
+            aria-label="약관 질문"
+          />
+          <button className="secondary-button send-btn" type="submit" disabled={!input.trim()}>
+            전송
+          </button>
+        </form>
+      </footer>
     </main>
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  copiedId,
+  onCopy
+}: {
+  message: ChatMessage;
+  copiedId: string | null;
+  onCopy: (ans: PolicyAnswer) => void;
+}) {
   if (message.role === "assistant" && message.answer) {
     const ans = message.answer;
+    const isCopied = copiedId === message.id;
     return (
       <article className="message assistant answer-card">
         <div className="card-top">
           <span className="card-logo-badge">DB손보</span>
-          <span className="card-category-tag">약관 분석 리포트</span>
+          <span className="card-category-tag">공식 약관 RAG 리포트</span>
+          <button className="copy-action-btn" onClick={() => onCopy(ans)}>
+            {isCopied ? "복사 완료! ✔" : "📋 클립보드 복사"}
+          </button>
         </div>
 
         {ans.summary && (
@@ -520,8 +635,16 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     );
   }
 
+  if (message.role === "system") {
+    return (
+      <div className="message system-bubble">
+        {message.content}
+      </div>
+    );
+  }
+
   return (
-    <div className={`message ${message.role === "user" ? "user-bubble" : "system-bubble"}`}>
+    <div className="message user-bubble">
       {message.content}
     </div>
   );
