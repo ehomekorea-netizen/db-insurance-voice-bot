@@ -201,7 +201,7 @@ export function VoiceCounselorApp() {
               type: "server_vad",
               threshold: 0.85,
               prefix_padding_ms: 300,
-              silence_duration_ms: 600
+              silence_duration_ms: 1000
             }
           }
         });
@@ -227,18 +227,31 @@ export function VoiceCounselorApp() {
                 }
               }
 
-              const currentLiveText = interimTranscript || finalTranscript;
-              if (currentLiveText.trim()) {
+              const currentLiveText = (interimTranscript || finalTranscript).trim();
+              if (currentLiveText) {
                 setUserLiveTranscript(currentLiveText);
 
-                const optimisticId = optimisticMessageIdRef.current;
-                if (optimisticId) {
-                  setMessages((current) =>
-                    current.map((m) =>
-                      m.id === optimisticId ? { ...m, content: currentLiveText } : m
-                    )
+                setMessages((current) => {
+                  let optimisticId = optimisticMessageIdRef.current;
+                  if (!optimisticId) {
+                    const lastMsg = current[current.length - 1];
+                    if (!lastMsg || lastMsg.role !== "user") {
+                      optimisticId = `optimistic-${Date.now()}`;
+                      optimisticMessageIdRef.current = optimisticId;
+                      return [
+                        ...current,
+                        { id: optimisticId, role: "user", content: currentLiveText }
+                      ];
+                    } else {
+                      optimisticId = lastMsg.id;
+                      optimisticMessageIdRef.current = optimisticId;
+                    }
+                  }
+
+                  return current.map((m) =>
+                    m.id === optimisticId ? { ...m, content: currentLiveText } : m
                   );
-                }
+                });
               }
             };
 
@@ -356,14 +369,17 @@ export function VoiceCounselorApp() {
       setMicMuted(false);
     }
 
-    // Mute mic and create optimistic user bubble when AI response is created (begins generation/playback)
+    // Mute mic when AI response is created (begins generation/playback)
     if (event.type === "response.created") {
       if (unmuteTimeoutRef.current) {
         clearTimeout(unmuteTimeoutRef.current);
         unmuteTimeoutRef.current = null;
       }
       setMicMuted(true);
+    }
 
+    // Create optimistic user bubble when user actually starts speaking
+    if (event.type === "input_audio_buffer.speech_started") {
       const optimisticId = `optimistic-${Date.now()}`;
       optimisticMessageIdRef.current = optimisticId;
       setMessages((current) => {
