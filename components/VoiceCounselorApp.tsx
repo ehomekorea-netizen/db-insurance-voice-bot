@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
 import type { PolicyAnswer, PolicyIntent } from "@/lib/policyKnowledge";
-import { fullRealtimeSessionConfig } from "@/lib/realtimeSession";
+
 
 type ChatMessage =
   | { id: string; role: "system" | "user"; content: string }
@@ -159,10 +159,15 @@ export function VoiceCounselorApp() {
         setIsConnected(true);
         setIsConnecting(false);
 
-        // Explicitly update session configuration on connection to enable Whisper transcription, instructions, and tools
+        // Enable Whisper transcription for Korean (input_audio_transcription is not accepted by client_secrets, must be set via session.update)
         sendRealtimeEvent({
           type: "session.update",
-          session: fullRealtimeSessionConfig
+          session: {
+            input_audio_transcription: {
+              model: "whisper-1",
+              language: "ko"
+            }
+          }
         });
 
         // Stabilize mic stream pop noise to prevent VAD from interrupting the initial greeting

@@ -20,50 +20,49 @@ export const REALTIME_SYSTEM_INSTRUCTIONS = `
 
 export const realtimeSessionConfig = {
   session: {
-    model: REALTIME_MODEL
+    type: "realtime",
+    model: REALTIME_MODEL,
+    instructions: REALTIME_SYSTEM_INSTRUCTIONS,
+    audio: {
+      output: {
+        voice: "marin"
+      }
+    },
+    tools: [
+      {
+        type: "function",
+        name: "prepare_policy_answer",
+        description:
+          "사용자 질문에 대해 DB손해보험 공식 상품공시실(판매/판매중지 상품) 검색 및 o3-mini RAG 분석을 결합한 상세 텍스트 리포트를 생성하여 화면에 띄웁니다.",
+        parameters: {
+          type: "object",
+          properties: {
+            question: {
+              type: "string",
+              description: "사용자의 구체적인 약관 질문 원문"
+            },
+            intent: {
+              type: "string",
+              enum: [
+                "coverage_check",
+                "exclusion_check",
+                "claim_documents",
+                "policy_explanation",
+                "official_notice",
+                "handoff_required"
+              ],
+              description: "상담 목적 인텐트"
+            },
+            product_hint: {
+              type: "string",
+              description: "사용자가 반문 답변 등으로 확인해 준 구체적인 상품명, 가입 연도(예: 2018년), 혹은 판매상태(예: 판매중지 상품) 정보"
+            }
+          },
+          required: ["question", "intent"]
+        }
+      }
+    ],
+    tool_choice: "auto"
   }
 };
 
-export const fullRealtimeSessionConfig = {
-  instructions: REALTIME_SYSTEM_INSTRUCTIONS,
-  input_audio_transcription: {
-    model: "whisper-1",
-    language: "ko"
-  },
-  voice: "marin",
-  tools: [
-    {
-      type: "function",
-      name: "prepare_policy_answer",
-      description:
-        "사용자 질문에 대해 DB손해보험 공식 상품공시실(판매/판매중지 상품) 검색 및 o3-mini RAG 분석을 결합한 상세 텍스트 리포트를 생성하여 화면에 띄웁니다.",
-      parameters: {
-        type: "object",
-        properties: {
-          question: {
-            type: "string",
-            description: "사용자의 구체적인 약관 질문 원문"
-          },
-          intent: {
-            type: "string",
-            enum: [
-              "coverage_check",
-              "exclusion_check",
-              "claim_documents",
-              "policy_explanation",
-              "official_notice",
-              "handoff_required"
-            ],
-            description: "상담 목적 인텐트"
-          },
-          product_hint: {
-            type: "string",
-            description: "사용자가 반문 답변 등으로 확인해 준 구체적인 상품명, 가입 연도(예: 2018년), 혹은 판매상태(예: 판매중지 상품) 정보"
-          }
-        },
-        required: ["question", "intent"]
-      }
-    }
-  ],
-  tool_choice: "auto"
-};
