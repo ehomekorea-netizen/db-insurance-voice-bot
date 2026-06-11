@@ -91,17 +91,28 @@ export function VoiceCounselorApp() {
     return "음성 대기 중";
   }, [isConnecting, isConnected]);
 
-  // Reset inactivity timer (20 seconds auto-disconnect for cost protection)
-  const resetInactivityTimer = () => {
+  // Monitor active conversation states to manage 20-second inactivity timer
+  useEffect(() => {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
     }
-    inactivityTimerRef.current = setTimeout(() => {
-      console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
-      stopRealtime();
-      setError("20초 동안 대화가 없어 음성 상담이 자동으로 종료되었습니다.");
-    }, 20 * 1000);
-  };
+
+    if (isConnected && !isMicMuted && !isSearching && !isFinalEndingPending.current) {
+      inactivityTimerRef.current = setTimeout(() => {
+        console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
+        stopRealtime();
+        setError("20초 동안 대화가 없어 음성 상담이 자동으로 종료되었습니다.");
+      }, 20 * 1000);
+    }
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+    };
+  }, [isConnected, isMicMuted, isSearching]);
 
   // Monitor session duration & enforce 3-minute hard cap
   useEffect(() => {
@@ -151,7 +162,6 @@ export function VoiceCounselorApp() {
   async function startRealtime() {
     setError(null);
     setIsConnecting(true);
-    resetInactivityTimer();
 
     try {
       const tokenResponse = await fetch("/api/realtime/token", { method: "POST" });
@@ -197,7 +207,7 @@ export function VoiceCounselorApp() {
         setIsConnected(true);
         setIsConnecting(false);
 
-        // Enable Whisper transcription for Korean and adjust VAD sensitivity (input_audio_transcription/turn_detection must be updated dynamically)
+        // Disable server VAD initially to prevent connection click/pop noise from triggering a response
         sendRealtimeEvent({
           type: "session.update",
           session: {
@@ -205,12 +215,7 @@ export function VoiceCounselorApp() {
               model: "whisper-1",
               language: "ko"
             },
-            turn_detection: {
-              type: "server_vad",
-              threshold: 0.85,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 1000
-            }
+            turn_detection: null
           }
         });
 
@@ -269,7 +274,6 @@ export function VoiceCounselorApp() {
         }, 800);
       };
       dc.onmessage = (event) => {
-        resetInactivityTimer();
         handleRealtimeEvent(event.data);
       };
       dc.onerror = () => setError("Realtime data channel 오류가 발생했습니다.");
@@ -314,6 +318,23 @@ export function VoiceCounselorApp() {
     streamRef.current = null;
     audioRef.current = null;
     processedCallIdsRef.current.clear();
+
+    if (isConnected) {
+      const now = new Date();
+      const formattedTime = now.toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+      addMessage({
+        role: "system",
+        content: `━━━ 음성 상담 종료 (${formattedTime}) ━━━`
+      });
+    }
+
     setIsConnected(false);
     setIsConnecting(false);
     setIsMicMuted(false);
@@ -365,6 +386,12 @@ export function VoiceCounselorApp() {
       }
       setMicMuted(true);
       setUserLiveTranscript("");
+      sendRealtimeEvent({
+        type: "session.update",
+        session: {
+          turn_detection: null
+        }
+      });
     }
 
     // Create optimistic user bubble when user actually starts speaking
@@ -389,8 +416,16 @@ export function VoiceCounselorApp() {
       setLiveTranscript("");
     }
 
-    // Response done: unmute mic
+    // Response done: unmute mic and enable VAD dynamically
     if (event.type === "response.done") {
+      if (isFinalEndingPending.current) {
+        setTimeout(() => {
+          isFinalEndingPending.current = false;
+          stopRealtime();
+        }, 1500);
+        return;
+      }
+
       if (unmuteTimeoutRef.current) {
         clearTimeout(unmuteTimeoutRef.current);
       }
@@ -398,10 +433,18 @@ export function VoiceCounselorApp() {
         setMicMuted(false);
         unmuteTimeoutRef.current = null;
 
-        if (isFinalEndingPending.current) {
-          isFinalEndingPending.current = false;
-          stopRealtime();
-        }
+        // Dynamically enable server VAD now that AI has finished speaking
+        sendRealtimeEvent({
+          type: "session.update",
+          session: {
+            turn_detection: {
+              type: "server_vad",
+              threshold: 0.85,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 1000
+            }
+          }
+        });
       }, 1000);
     }
 
