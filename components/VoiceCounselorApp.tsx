@@ -51,6 +51,18 @@ export function VoiceCounselorApp() {
         }
       });
     }
+
+    if (recognitionRef.current) {
+      try {
+        if (muted) {
+          recognitionRef.current.abort();
+        } else {
+          recognitionRef.current.start();
+        }
+      } catch (e) {
+        // Swallowing already started/stopped exceptions
+      }
+    }
   }
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -70,6 +82,7 @@ export function VoiceCounselorApp() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const optimisticMessageIdRef = useRef<string | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -192,6 +205,59 @@ export function VoiceCounselorApp() {
           }
         });
 
+        // Initialize Web Speech API for real-time user transcription mapping as they speak
+        if (typeof window !== "undefined") {
+          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = "ko-KR";
+
+            recognition.onresult = (event: any) => {
+              let interimTranscript = "";
+              let finalTranscript = "";
+
+              for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                  finalTranscript += event.results[i][0].transcript;
+                } else {
+                  interimTranscript += event.results[i][0].transcript;
+                }
+              }
+
+              const currentLiveText = interimTranscript || finalTranscript;
+              if (currentLiveText.trim()) {
+                setUserLiveTranscript(currentLiveText);
+
+                const optimisticId = optimisticMessageIdRef.current;
+                if (optimisticId) {
+                  setMessages((current) =>
+                    current.map((m) =>
+                      m.id === optimisticId ? { ...m, content: currentLiveText } : m
+                    )
+                  );
+                }
+              }
+            };
+
+            recognition.onerror = (e: any) => {
+              console.warn("SpeechRecognition error:", e.error);
+            };
+
+            recognition.onend = () => {
+              console.log("SpeechRecognition ended");
+            };
+
+            recognitionRef.current = recognition;
+            try {
+              recognition.start();
+            } catch (err) {
+              console.error("Failed to start SpeechRecognition:", err);
+            }
+          }
+        }
+
         // Stabilize mic stream pop noise to prevent VAD from interrupting the initial greeting
         setTimeout(() => {
           sendRealtimeEvent({
@@ -251,6 +317,12 @@ export function VoiceCounselorApp() {
     setIsConnected(false);
     setIsConnecting(false);
     setIsMicMuted(false);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
     if (unmuteTimeoutRef.current) {
       clearTimeout(unmuteTimeoutRef.current);
       unmuteTimeoutRef.current = null;
