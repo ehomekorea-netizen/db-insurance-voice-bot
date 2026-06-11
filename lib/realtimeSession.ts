@@ -1,4 +1,4 @@
-export const REALTIME_MODEL = "gpt-4o-mini-realtime-preview";
+export const REALTIME_MODEL = "gpt-realtime-mini";
 
 export const REALTIME_SYSTEM_INSTRUCTIONS = `
 당신은 DB손해보험의 전문적인 약관/기초서류 상담을 제공하는 AI 음성 상담원입니다. 
