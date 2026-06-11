@@ -49,11 +49,7 @@ export function VoiceCounselorApp() {
     return "음성 대기 중";
   }, [isConnecting, isConnected]);
 
-  const searchingMessage = useMemo(() => {
-    if (!activeSearchQuery) return "프로미가 DB손해보험 상품공시실에서 관련 약관을 조회하는 중입니다...";
-    const keywords = extractKoreanKeywords(activeSearchQuery);
-    return `프로미가 '${keywords}' 관련 약관 및 보장 여부를 DB손해보험 상품공시실에서 조회하는 중입니다...`;
-  }, [activeSearchQuery]);
+  const searchingMessage = "네 PA님 금방 안내드리겠습니다";
 
   // Audio Playback with TTS
   async function playTts(text: string): Promise<void> {
@@ -283,8 +279,7 @@ export function VoiceCounselorApp() {
     setError(null);
 
     try {
-      const keywords = extractKoreanKeywords(correctedQuestion);
-      const searchSpeakText = `${keywords} 관련 내용을 조회 중입니다.`;
+      const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
 
       // Parallel run: play searching notification voice & request RAG response
       const ttsPromise = playTts(searchSpeakText);
@@ -449,8 +444,7 @@ export function VoiceCounselorApp() {
     setActiveSearchQuery(question);
     setIsSearching(true);
     try {
-      const keywords = extractKoreanKeywords(question);
-      const searchSpeakText = `${keywords} 관련 내용을 조회 중입니다.`;
+      const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
 
       const ttsPromise = playTts(searchSpeakText);
       const apiPromise = requestPolicyAnswer(question);
@@ -817,6 +811,32 @@ function MessageBubble({
   }
 
   if (message.role === "system") {
+    if (message.id === "welcome") {
+      return (
+        <div className="welcome-banner-card">
+          <div className="welcome-banner-header">
+            <span className="welcome-banner-badge">GUIDE</span>
+            <h4>동목포 부지점장 프로미의 약관 안내</h4>
+          </div>
+          <div className="welcome-banner-body">
+            <p className="welcome-greet">반갑습니다 PA님! DB손해보험 부지점장 프로미입니다. 😊</p>
+            <p className="welcome-instruction">
+              우측 상단의 <strong className="highlight-text">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어 약관 조회 및 보장 조건에 대해 대화로 편하게 안내받으실 수 있습니다.
+            </p>
+            <div className="welcome-features">
+              <div className="feature-item">
+                <span className="feature-dot"></span>
+                <span><strong>음성 인식 보정:</strong> "2번비", "수치료", "포장" 등 전사 오류도 올바른 용어(입원비, 도수치료, 보장)로 자동 보정됩니다.</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-dot"></span>
+                <span><strong>실시간 구글 검색:</strong> 최신 DB손보 공식 공시 자료와 규정을 Google Search로 정밀 검색합니다.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="message system-bubble">
         {message.content}
