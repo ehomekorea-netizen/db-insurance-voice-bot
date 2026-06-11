@@ -111,11 +111,11 @@ export async function POST(request: Request) {
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  const jinaApiKey = process.env.JINA_API_KEY;
+  const serperApiKey = process.env.SERPER_API_KEY;
 
   // FALLBACK: If API Keys are not configured, fallback to local sample data
-  if (!apiKey || !jinaApiKey) {
-    console.warn("경고: OPENAI_API_KEY 또는 JINA_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
+  if (!apiKey || !serperApiKey) {
+    console.warn("경고: OPENAI_API_KEY 또는 SERPER_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
     const fallbackAnswer = buildPolicyAnswer({
       question,
       intent: body.intent ?? classifyIntent(question),
@@ -150,62 +150,73 @@ export async function POST(request: Request) {
     const searchQuery = await generateSearchQuery(openai, question, productHint);
 
     let finalResults: any[] = [];
-    let searchContext = "";
     let usedEngine = "자체 사전지식";
+    let searchSuccess = false;
+    let searchErrors: string[] = [];
 
-    console.log(`Jina Search 실행 (최적화): ${searchQuery}`);
+    // Try Google Search via Serper.dev
+    console.log(`Google Serper Search 실행 (최적화): ${searchQuery}`);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for Jina
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      const jinaQuery = `${searchQuery} (site:idb.co.kr OR site:idbins.com OR site:fss.or.kr OR site:knia.or.kr OR site:klia.or.kr OR site:ppomppu.co.kr OR site:clien.net OR site:bobaedream.co.kr OR site:dcinside.com OR site:naver.com OR site:tistory.com)`;
-      
-      const searchResponse = await fetch("https://s.jina.ai/", {
+      const response = await fetch("https://google.serper.dev/search", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Authorization": `Bearer ${jinaApiKey}`
+          "X-API-KEY": serperApiKey,
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          q: jinaQuery
+          q: searchQuery,
+          gl: "kr",
+          hl: "ko",
+          num: 4
         }),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
-      if (!searchResponse.ok) {
-        const errText = await searchResponse.text();
-        throw new Error(`Status ${searchResponse.status}: ${errText.substring(0, 80).trim()}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Serper HTTP ${response.status}: ${errText.substring(0, 80).trim()}`);
       }
 
-      const searchData = await searchResponse.json();
-      const results = searchData.data || [];
-      usedEngine = results.length > 0 ? "Jina Search" : "자체 사전지식 (Jina 결과없음)";
+      const data = await response.json();
+      const results = data.organic || [];
 
-      finalResults = results.slice(0, 4).map((r: any) => ({
-        title: r.title || "참고자료",
-        url: r.url || "",
-        content: r.content || "",
-        raw_content: r.content || ""
-      }));
+      if (results.length > 0) {
+        finalResults = results.map((r: any) => ({
+          title: r.title || "참고자료",
+          url: r.link || "",
+          content: r.snippet || "",
+          raw_content: r.snippet || ""
+        }));
+        usedEngine = "Google (Serper)";
+        searchSuccess = true;
+        console.log(`Google Serper Search 성공: ${finalResults.length}개 결과`);
+      } else {
+        console.log("Google Serper Search 결과 없음");
+      }
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn("Google Serper Search 실패:", errMsg);
+      searchErrors.push(`Serper: ${errMsg}`);
+    }
 
-      if (finalResults.length > 0) {
-        searchContext = finalResults.map((r: any, i: number) => {
-          return `[검색 자료 ${i + 1}]
+    let searchContext = "";
+    if (searchSuccess && finalResults.length > 0) {
+      searchContext = finalResults.map((r: any, i: number) => {
+        return `[검색 자료 ${i + 1}]
 제목: ${r.title}
 출처 주소: ${r.url}
 내용: ${r.content}`;
-        }).join("\n\n");
-      } else {
-        searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
-      }
-    } catch (searchErr: any) {
-      const errMsg = searchErr instanceof Error ? searchErr.message : String(searchErr);
-      console.warn("Jina 검색 중 오류 발생으로 자체 지식 분석으로 폴백합니다:", searchErr);
-      usedEngine = `자체 사전지식 (Jina 오류: ${errMsg})`;
-      searchContext = "Jina 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
+      }).join("\n\n");
+    } else {
+      usedEngine = searchErrors.length > 0
+        ? `자체 사전지식 (${searchErrors.join(", ")})`
+        : "자체 사전지식";
+      searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했거나 검색 엔진에 에러가 발생하여 자체 지식 분석 결과를 제공합니다.";
     }
 
     // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
