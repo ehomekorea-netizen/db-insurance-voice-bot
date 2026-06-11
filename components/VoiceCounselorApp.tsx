@@ -42,7 +42,7 @@ export function VoiceCounselorApp() {
       id: "welcome",
       role: "system",
       content:
-        "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. 우측 상단의 [도움요청 🎙️] 버튼을 눌러 음성 상담을 시작하거나, 하단에 약관 질문을 텍스트로 입력해 주세요."
+        "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
     }
   ]);
 
@@ -155,13 +155,15 @@ export function VoiceCounselorApp() {
       dc.onopen = () => {
         setIsConnected(true);
         setIsConnecting(false);
-        sendRealtimeEvent({
-          type: "response.create",
-          response: {
-            instructions:
-              "사용자에게 프로미 아바타로서 친근하고 정중하게 한국어로 인사하고, 궁금하신 DB손해보험 상품명이나 약관 질문을 말씀해달라고 간결하게 안내하세요. 한 문장으로만 첫 인사를 말하세요."
-          }
-        });
+        // Stabilize mic stream pop noise to prevent VAD from interrupting the initial greeting
+        setTimeout(() => {
+          sendRealtimeEvent({
+            type: "response.create",
+            response: {
+              instructions: "사용자에게 한국어로 'PA님 무엇을 도와드릴까요?'라고 단 한 문장으로 간결하게 첫 인사를 하십시오. 다른 불필요한 안내 멘트는 절대로 추가하지 마십시오."
+            }
+          });
+        }, 800);
       };
       dc.onmessage = (event) => {
         resetInactivityTimer();
@@ -232,13 +234,12 @@ export function VoiceCounselorApp() {
     }
 
     if (event.type === "response.output_audio_transcript.done") {
-      setLiveTranscript((finalText) => {
-        const cleaned = finalText.trim();
-        if (cleaned) {
-          addMessage({ role: "assistant", content: cleaned });
-        }
-        return "";
-      });
+      const text = event.transcript || liveTranscript;
+      const cleaned = text.trim();
+      if (cleaned) {
+        addMessage({ role: "assistant", content: cleaned });
+      }
+      setLiveTranscript("");
     }
 
     if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
