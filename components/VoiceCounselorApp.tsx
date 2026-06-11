@@ -34,6 +34,7 @@ export function VoiceCounselorApp() {
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [userLiveTranscript, setUserLiveTranscript] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -244,10 +245,22 @@ export function VoiceCounselorApp() {
     const event = safeJsonParse<RealtimeEvent>(rawData);
     if (!event?.type) return;
 
+    // Debug: log all event types for transcription troubleshooting
+    if (event.type.includes("transcription") || event.type.includes("input_audio") || event.type === "error" || event.type === "session.updated") {
+      console.log("[Realtime Event]", event.type, event);
+    }
+
+    // Handle session errors
+    if (event.type === "error") {
+      console.error("[Realtime Error]", event);
+    }
+
+    // Assistant speech: live delta
     if (event.type === "response.output_audio_transcript.delta" && event.delta) {
       setLiveTranscript((current) => `${current}${event.delta}`);
     }
 
+    // Assistant speech: completed
     if (event.type === "response.output_audio_transcript.done") {
       const text = event.transcript || liveTranscript;
       const cleaned = text.trim();
@@ -257,7 +270,14 @@ export function VoiceCounselorApp() {
       setLiveTranscript("");
     }
 
+    // User speech: live delta (real-time as user speaks)
+    if (event.type === "conversation.item.input_audio_transcription.delta" && event.delta) {
+      setUserLiveTranscript((current) => `${current}${event.delta}`);
+    }
+
+    // User speech: completed transcription
     if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
+      setUserLiveTranscript("");
       addMessage({ role: "user", content: event.transcript });
     }
 
@@ -527,7 +547,23 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           );
         })}
 
-        {/* Live speech transcript (Typing bubble) */}
+        {/* User live speech transcript */}
+        {userLiveTranscript && (
+          <div className="message-wrapper user-wrapper">
+            <div className="bubble-wrapper">
+              <span className="sender-name">나 (말하는 중)</span>
+              <div className="message user-bubble live-typing-bubble">
+                <span className="live-transcript-tag">🎙️ 음성 인식 중</span>
+                <p>{userLiveTranscript}</p>
+              </div>
+            </div>
+            <div className="avatar-wrapper">
+              <div className="user-avatar-circle">PA</div>
+            </div>
+          </div>
+        )}
+
+        {/* Assistant live speech transcript (Typing bubble) */}
         {liveTranscript && (
           <div className="message-wrapper assistant-wrapper">
             <div className="avatar-wrapper">
