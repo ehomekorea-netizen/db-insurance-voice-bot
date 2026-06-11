@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       intent: body.intent ?? classifyIntent(question),
       productHint: body.product_hint
     });
+    fallbackAnswer.searchEngine = "로컬 MVP 샘플 데이터";
     return NextResponse.json(fallbackAnswer);
   }
 
@@ -147,6 +148,7 @@ export async function POST(request: Request) {
 
     let finalResults: any[] = [];
     let searchContext = "";
+    let usedEngine = "자체 사전지식";
 
     if (jinaApiKey) {
       console.log(`Jina Search 실행 (최적화): ${searchQuery}`);
@@ -174,6 +176,7 @@ export async function POST(request: Request) {
 
         const searchData = await searchResponse.json();
         const results = searchData.data || [];
+        usedEngine = results.length > 0 ? "Jina Search" : "자체 사전지식 (Jina 결과없음)";
 
         finalResults = results.slice(0, 4).map((r: any) => ({
           title: r.title || "참고자료",
@@ -194,6 +197,7 @@ export async function POST(request: Request) {
         }
       } catch (searchErr) {
         console.warn("Jina 검색 중 오류 발생으로 자체 지식 분석으로 폴백합니다:", searchErr);
+        usedEngine = "자체 사전지식 (Jina 오류)";
         searchContext = "Jina 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
       }
     } else {
@@ -244,6 +248,7 @@ export async function POST(request: Request) {
 
         const searchData = await searchResponse.json();
         const results = searchData.results || [];
+        usedEngine = results.length > 0 ? "Tavily Search" : "자체 사전지식 (Tavily 결과없음)";
 
         // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
         const filteredResults = results.filter((r: any) => {
@@ -418,7 +423,8 @@ ${searchContext}`
         "해당 상품이 판매상품인지 판매중지 상품인지 여부"
       ],
       citations,
-      disclaimer: "본 답변은 DB손해보험 공식 상품공시실의 기초서류 검색을 바탕으로 o3-mini 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+      disclaimer: "본 답변은 DB손해보험 공식 상품공시실의 기초서류 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다.",
+      searchEngine: usedEngine
     });
 
   } catch (err: any) {

@@ -665,7 +665,7 @@ function MessageBubble({
       <article className="message assistant answer-card">
         <div className="card-top">
           <span className="card-logo-badge">DB손보</span>
-          <span className="card-category-tag">공식 약관 RAG 리포트</span>
+          <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Tavily"})</span>
           <button className="copy-action-btn" onClick={() => onCopy(ans)}>
             {isCopied ? "복사 완료! ✔" : "📋 클립보드 복사"}
           </button>
