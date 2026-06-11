@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         if (annotation.type === "file_citation") {
           const fileCitation = annotation.file_citation;
           const fileId = fileCitation?.file_id;
-          const quote = fileCitation?.quote || "약관 원문 인용";
+          const quote = (fileCitation as any)?.quote || "약관 원문 인용";
 
           let filename = "DB손해보험 약관 PDF";
           if (fileId) {
@@ -176,10 +176,10 @@ export async function POST(request: Request) {
   } finally {
     // 7. Cleanup ephemeral thread & assistant resources to prevent leaks
     if (thread?.id) {
-      await openai.beta.threads.del(thread.id).catch(err => console.error("Thread 삭제 실패:", err));
+      await openai.beta.threads.delete(thread.id).catch(err => console.error("Thread 삭제 실패:", err));
     }
     if (assistant?.id) {
-      await openai.beta.assistants.del(assistant.id).catch(err => console.error("Assistant 삭제 실패:", err));
+      await openai.beta.assistants.delete(assistant.id).catch(err => console.error("Assistant 삭제 실패:", err));
     }
   }
 }
