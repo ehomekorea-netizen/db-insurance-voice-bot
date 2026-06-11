@@ -296,7 +296,14 @@ export function VoiceCounselorApp() {
     setError(null);
 
     try {
-      const payload = await requestPolicyAnswer(question);
+      const keywords = extractKoreanKeywords(question);
+      const searchSpeakText = `${keywords} 관련 내용을 조회 중입니다.`;
+
+      // Parallel run: play searching notification voice & request RAG response
+      const ttsPromise = playTts(searchSpeakText);
+      const apiPromise = requestPolicyAnswer(question);
+
+      const [, payload] = await Promise.all([ttsPromise, apiPromise]);
       setIsSearching(false);
 
       if (payload.isSimpleChat) {
@@ -458,7 +465,13 @@ export function VoiceCounselorApp() {
     setActiveSearchQuery(question);
     setIsSearching(true);
     try {
-      await requestPolicyAnswer(question);
+      const keywords = extractKoreanKeywords(question);
+      const searchSpeakText = `${keywords} 관련 내용을 조회 중입니다.`;
+
+      const ttsPromise = playTts(searchSpeakText);
+      const apiPromise = requestPolicyAnswer(question);
+
+      await Promise.all([ttsPromise, apiPromise]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "답변 생성에 실패했습니다.");
     } finally {
