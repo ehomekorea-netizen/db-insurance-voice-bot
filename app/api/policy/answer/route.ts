@@ -156,12 +156,16 @@ export async function POST(request: Request) {
 
       const jinaQuery = `${searchQuery} (site:idb.co.kr OR site:idbins.com OR site:fss.or.kr OR site:knia.or.kr OR site:klia.or.kr OR site:ppomppu.co.kr OR site:clien.net OR site:bobaedream.co.kr OR site:dcinside.com OR site:naver.com OR site:tistory.com)`;
       
-      const searchResponse = await fetch(`https://s.jina.ai/${encodeURIComponent(jinaQuery)}`, {
-        method: "GET",
+      const searchResponse = await fetch("https://s.jina.ai/", {
+        method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "Accept": "application/json",
           "Authorization": `Bearer ${jinaApiKey}`
         },
+        body: JSON.stringify({
+          q: jinaQuery
+        }),
         signal: controller.signal
       });
 
