@@ -225,7 +225,7 @@ export function VoiceCounselorApp() {
       let interimTranscript = "";
       let finalTranscript = "";
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      for (let i = 0; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript;
         } else {
@@ -233,7 +233,7 @@ export function VoiceCounselorApp() {
         }
       }
 
-      const currentLiveText = (interimTranscript || finalTranscript).trim();
+      const currentLiveText = (finalTranscript + interimTranscript).trim();
       if (currentLiveText) {
         setUserLiveTranscript(currentLiveText);
 
@@ -629,21 +629,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           </div>
         )}
 
-        {/* Assistant live speech transcript (Typing bubble) */}
-        {liveTranscript && (
-          <div className="message-wrapper assistant-wrapper">
-            <div className="avatar-wrapper">
-              <img src="/promy.png" alt="PROMY" className="avatar-img" />
-            </div>
-            <div className="bubble-wrapper">
-              <span className="sender-name">프로미 (말하는 중)</span>
-              <div className="message assistant-bubble live-typing-bubble">
-                <span className="live-transcript-tag">🎙️ 실시간 음성</span>
-                <p>{liveTranscript}</p>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Searching Loader Card */}
         {isSearching && (
