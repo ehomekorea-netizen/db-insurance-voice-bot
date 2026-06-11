@@ -47,3 +47,8 @@ OPENAI_API_KEY=sk-proj-...
 - DB/vector: Supabase Postgres + pgvector or OpenAI File Search
 - Secrets: Vercel Environment Variables
 
+## PWA & Tavily Integration (Latest)
+
+이 프로젝트는 현재 **Tavily Web Search API**와 연동하여 DB손해보험 공식 도메인(`idbins.com`) 내의 정보를 실시간으로 검색하여 답변을 생성하도록 최적화되어 있습니다. 또한 PWA로 변환되어 모바일 및 데스크톱 홈 화면에 설치하여 사용하실 수 있습니다.
+
+
