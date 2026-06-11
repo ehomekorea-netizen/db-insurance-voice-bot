@@ -19,11 +19,7 @@ export const REALTIME_SYSTEM_INSTRUCTIONS = `
 `;
 
 export const realtimeSessionConfig = {
-  session: {
-    type: "realtime",
-    model: REALTIME_MODEL,
-    modalities: ["audio", "text"]
-  }
+  model: REALTIME_MODEL
 };
 
 export const fullRealtimeSessionConfig = {
