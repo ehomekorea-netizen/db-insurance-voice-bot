@@ -12,7 +12,7 @@ type PolicyAnswerRequest = {
 };
 
 // Preprocess conversational user question into optimized Korean search keywords
-async function generateSearchQuery(openai: OpenAI, question: string, productHint?: string): Promise<string> {
+async function generateSearchQuery(openai: OpenAI, question: string, currentDate: string, productHint?: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -20,7 +20,12 @@ async function generateSearchQuery(openai: OpenAI, question: string, productHint
         {
           role: "system",
           content: `당신은 DB손해보험 설계사(PA)를 지원하기 위한 한국어 보험 약관 RAG 검색 쿼리 최적화기입니다.
+현재 날짜와 시간 정보: ${currentDate}
 사용자의 질문과 상품 힌트를 분석하여, 공식 상품 공시실 및 보험 규정 검색에 가장 적절한 한글 검색 키워드들을 생성하십시오.
+
+[중요: 시간적 지칭어 처리 규칙]
+- 사용자가 '올해', '금년', '이번에', '최근' 등의 표현을 사용한 경우, 현재 날짜인 ${currentDate}를 기준으로 연도를 판단하십시오. 예를 들어 현재가 2026년인 상황에서 '올해 6월 개정'은 '2026년 6월 개정'으로 해석해야 하며, 검색어 키워드에 반드시 해당 구체적인 연도("2026년")를 명시적으로 변환하여 포함시키십시오.
+- '작년', '지난해'는 현재 연도 - 1년으로 매핑하여 검색어를 생성하십시오.
 
 [중요: 음성 인식(STT) 오타 및 보험 도메인 용어 교정 규칙]
 사용자의 질문은 음성 인식 과정을 거쳐 유입되므로, 발음이 유사한 오타나 오인식된 단어가 다수 포함되어 있습니다. 당신은 보험 전문가로서 컨텍스트와 의도(Intent)를 파악하여 아래와 같이 올바른 보험 도메인 용어로 반드시 보정한 후 검색 키워드를 생성해야 합니다.
@@ -110,6 +115,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "question is required" }, { status: 400 });
   }
 
+  const now = new Date();
+  const currentDateString = now.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  }); // e.g. "2026년 6월 12일 금요일"
+
   const apiKey = process.env.OPENAI_API_KEY;
   const serperApiKey = process.env.SERPER_API_KEY;
 
@@ -147,7 +161,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Optimize search query to get clean Korean terms instead of conversational sentence
-    const searchQuery = await generateSearchQuery(openai, question, productHint);
+    const searchQuery = await generateSearchQuery(openai, question, currentDateString, productHint);
 
     let finalResults: any[] = [];
     let usedEngine = "자체 사전지식";
@@ -229,8 +243,11 @@ export async function POST(request: Request) {
 사용자는 보험 설계사 또는 지점 임직원(보험 전문가)입니다. 
 제공된 [검색 및 공시자료]를 면밀히 추론/분석하여 사용자의 질문에 답변하십시오. 
 
+현재 시점 정보: ${currentDateString}
+
 [답변 작성 원칙]
 - 대화체나 존댓말을 장황하게 쓰지 말고, 공문서나 보고서 스타일로 전문 용어(면책, 자기부담금, 공제율, 특약, 구비서류 등)를 사용하여 핵심만 명확하게 작성하십시오.
+- 사용자가 '올해', '현재', '최근', '이번에'라고 언급하면 현재 시점인 ${currentDateString}를 기준으로 정확한 개정 내역이나 약관을 매핑하여 판단하십시오. 예를 들어 현재가 2026년인 상황에서 '올해 6월 개정'은 '2026년 6월 개정'으로 판단하고 약관 및 상품명을 매핑해야 합니다.
 - 사용자가 확인해 준 가입 연도나 판매유무(판매상품/판매중지) 단서가 있다면, 해당 약관 및 보상 시점을 기준으로 정확히 보상 범위나 구비서류를 추론하여 작성하십시오.
 - 제공된 자료 상에서 특정 정보가 확실하지 않다면, 추론 과정과 한계(예: "공시자료상 2009년 표준화 이전 상해의료비 세부 공제 비율은 확인되지 않음")를 솔직하게 명시하고, [확인 필요 사항]에 구체적으로 적어 넣으십시오.
 - 절대 임의로 답변을 꾸며내지 마십시오.
