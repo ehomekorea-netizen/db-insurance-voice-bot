@@ -155,6 +155,18 @@ export function VoiceCounselorApp() {
       dc.onopen = () => {
         setIsConnected(true);
         setIsConnecting(false);
+
+        // Explicitly update session configuration on connection to enable Whisper transcription in Korean
+        sendRealtimeEvent({
+          type: "session.update",
+          session: {
+            input_audio_transcription: {
+              model: "whisper-1",
+              language: "ko"
+            }
+          }
+        });
+
         // Stabilize mic stream pop noise to prevent VAD from interrupting the initial greeting
         setTimeout(() => {
           sendRealtimeEvent({
@@ -262,8 +274,25 @@ export function VoiceCounselorApp() {
     const args = safeJsonParse<{ question?: string; intent?: PolicyIntent; product_hint?: string }>(rawArguments) ?? {};
     const question = args.question?.trim() || "사용자 약관 질문";
 
+    const isConfirmation = (text: string) => {
+      const clean = text.trim().replace(/[\s,.!~?]+/g, "");
+      return ["네", "맞아요", "네맞아요", "응", "어", "맞아", "예", "맞습니다", "그렇습니다", "그럼요", "네그렇습니다", "ok", "yes", "y"].includes(clean.toLowerCase());
+    };
+
     // Deduplicate user bubble
     setMessages((current) => {
+      // If there is already a substantial user message in the history, we don't insert a fake question.
+      const hasExistingQuery = current.some(
+        (m) =>
+          m.role === "user" &&
+          m.content.length > 5 &&
+          !isConfirmation(m.content)
+      );
+
+      if (hasExistingQuery) {
+        return current;
+      }
+
       const lastMsg = current[current.length - 1];
       if (
         lastMsg &&
@@ -394,15 +423,9 @@ export function VoiceCounselorApp() {
     const requiredInfoText = ans.requiredInfo && ans.requiredInfo.length > 0
       ? `\n\n📋 정확한 확인을 위해 필요한 정보:\n${ans.requiredInfo.map((i) => `- ${i}`).join("\n")}`
       : "";
-    const citationsText = ans.citations && ans.citations.length > 0
-      ? `\n\n🔗 공식 출처 및 공시자료:\n${ans.citations.map((c) => `- ${c.title} (${c.sourceUrl})`).join("\n")}`
-      : "";
 
-    const copyText = `[DB손해보험 약관 RAG 분석 리포트]
-질문: ${question}
-
-💡 핵심 요약:
-${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText}
+    const copyText = `💡 핵심 요약:
+${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 
 ---
 * ${ans.disclaimer || "본 답변은 공식 공시자료 검색 기반 참고용이며, 최종 심사 결과와 다를 수 있습니다."}`;
@@ -485,12 +508,18 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
               )}
               <div className="bubble-wrapper">
                 {message.role === "assistant" && <span className="sender-name">프로미</span>}
+                {message.role === "user" && <span className="sender-name">나 (설계사)</span>}
                 <MessageBubble
                   message={message}
                   copiedId={copiedId}
                   onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
                 />
               </div>
+              {message.role === "user" && (
+                <div className="avatar-wrapper">
+                  <div className="user-avatar-circle">PA</div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -541,20 +570,6 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
 
         <div ref={messagesEndRef} />
       </section>
-
-      {/* Composer */}
-      <footer className="messenger-footer-area">
-        <form className="composer-form" onSubmit={submitTextQuestion}>
-          <input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            aria-label="약관 질문"
-          />
-          <button className="secondary-button send-btn" type="submit" disabled={!input.trim()}>
-            전송
-          </button>
-        </form>
-      </footer>
     </main>
   );
 }

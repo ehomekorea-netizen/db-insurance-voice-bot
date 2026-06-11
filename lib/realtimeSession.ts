@@ -23,6 +23,9 @@ export const realtimeSessionConfig = {
     type: "realtime",
     model: REALTIME_MODEL,
     instructions: REALTIME_SYSTEM_INSTRUCTIONS,
+    input_audio_transcription: {
+      model: "whisper-1"
+    },
     audio: {
       output: {
         voice: "marin"
