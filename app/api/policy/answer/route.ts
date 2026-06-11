@@ -107,11 +107,12 @@ export async function POST(request: Request) {
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
+  const jinaApiKey = process.env.JINA_API_KEY;
   const tavilyApiKey = process.env.TAVILY_API_KEY;
 
   // FALLBACK: If API Keys are not configured, fallback to local sample data
-  if (!apiKey || !tavilyApiKey) {
-    console.warn("경고: OPENAI_API_KEY 또는 TAVILY_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
+  if (!apiKey || (!jinaApiKey && !tavilyApiKey)) {
+    console.warn("경고: OPENAI_API_KEY 또는 검색 API 키(JINA_API_KEY / TAVILY_API_KEY)가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
     const fallbackAnswer = buildPolicyAnswer({
       question,
       intent: body.intent ?? classifyIntent(question),
@@ -143,99 +144,148 @@ export async function POST(request: Request) {
 
     // 2. Optimize search query to get clean Korean terms instead of conversational sentence
     const searchQuery = await generateSearchQuery(openai, question, productHint);
-    console.log(`Tavily 검색 실행 (최적화): ${searchQuery}`);
 
     let finalResults: any[] = [];
     let searchContext = "";
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+    if (jinaApiKey) {
+      console.log(`Jina Search 실행 (최적화): ${searchQuery}`);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for Jina
 
-      const searchResponse = await fetch("https://api.tavily.com/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          api_key: tavilyApiKey,
-          query: searchQuery,
-          search_depth: "advanced",
-          include_raw_content: true,
-          include_domains: [
-            "idb.co.kr",
-            "idbins.com",
-            "disclosure.idbins.com",
-            "fss.or.kr",
-            "knia.or.kr",
-            "klia.or.kr",
-            "e-insmarket.or.kr",
-            "kidi.or.kr",
-            "insnews.co.kr",
-            "ppomppu.co.kr",
-            "clien.net",
-            "bobaedream.co.kr",
-            "dcinside.com",
-            "cafe.naver.com",
-            "blog.naver.com",
-            "tistory.com"
-          ],
-          max_results: 5
-        }),
-        signal: controller.signal
-      });
+        const jinaQuery = `${searchQuery} (site:idb.co.kr OR site:idbins.com OR site:fss.or.kr OR site:knia.or.kr OR site:klia.or.kr OR site:ppomppu.co.kr OR site:clien.net OR site:bobaedream.co.kr OR site:dcinside.com OR site:naver.com OR site:tistory.com)`;
+        
+        const searchResponse = await fetch(`https://s.jina.ai/${encodeURIComponent(jinaQuery)}`, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${jinaApiKey}`
+          },
+          signal: controller.signal
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (!searchResponse.ok) {
-        const errText = await searchResponse.text();
-        throw new Error(`Tavily API responded with status ${searchResponse.status}: ${errText}`);
-      }
-
-      const searchData = await searchResponse.json();
-      const results = searchData.results || [];
-
-      // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
-      const filteredResults = results.filter((r: any) => {
-        const url = (r.url || "").toLowerCase();
-        const title = (r.title || "").toLowerCase();
-        // Filter out customer service main, FAQ pages, help pages, English pages, and IR files
-        if (
-          url.includes("/faq") ||
-          url.includes("/customer") ||
-          url.includes("/main") ||
-          url.includes("/index") ||
-          url.includes("faqdetail") ||
-          url.includes("/qna") ||
-          url.includes("/eng/") ||
-          url.includes("/en/") ||
-          url.includes("corporate") ||
-          url.includes("ir-") ||
-          url.includes("growth-stage") ||
-          title.includes("annual report") ||
-          title.includes("investor")
-        ) {
-          return false;
+        if (!searchResponse.ok) {
+          const errText = await searchResponse.text();
+          throw new Error(`Jina API responded with status ${searchResponse.status}: ${errText}`);
         }
-        return true;
-      });
 
-      finalResults = filteredResults.length > 0 ? filteredResults.slice(0, 4) : results.slice(0, 3);
+        const searchData = await searchResponse.json();
+        const results = searchData.data || [];
 
-      if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
-        searchContext = finalResults.map((r: any, i: number) => {
-          const textContent = r.raw_content || r.content || "";
-          return `[검색 자료 ${i + 1}]
+        finalResults = results.slice(0, 4).map((r: any) => ({
+          title: r.title || "참고자료",
+          url: r.url || "",
+          content: r.content || "",
+          raw_content: r.content || ""
+        }));
+
+        if (finalResults.length > 0) {
+          searchContext = finalResults.map((r: any, i: number) => {
+            return `[검색 자료 ${i + 1}]
+제목: ${r.title}
+출처 주소: ${r.url}
+내용: ${r.content}`;
+          }).join("\n\n");
+        } else {
+          searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
+        }
+      } catch (searchErr) {
+        console.warn("Jina 검색 중 오류 발생으로 자체 지식 분석으로 폴백합니다:", searchErr);
+        searchContext = "Jina 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
+      }
+    } else {
+      console.log(`Tavily 검색 실행 (최적화): ${searchQuery}`);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+        const searchResponse = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            api_key: tavilyApiKey,
+            query: searchQuery,
+            search_depth: "advanced",
+            include_raw_content: true,
+            include_domains: [
+              "idb.co.kr",
+              "idbins.com",
+              "disclosure.idbins.com",
+              "fss.or.kr",
+              "knia.or.kr",
+              "klia.or.kr",
+              "e-insmarket.or.kr",
+              "kidi.or.kr",
+              "insnews.co.kr",
+              "ppomppu.co.kr",
+              "clien.net",
+              "bobaedream.co.kr",
+              "dcinside.com",
+              "cafe.naver.com",
+              "blog.naver.com",
+              "tistory.com"
+            ],
+            max_results: 5
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!searchResponse.ok) {
+          const errText = await searchResponse.text();
+          throw new Error(`Tavily API responded with status ${searchResponse.status}: ${errText}`);
+        }
+
+        const searchData = await searchResponse.json();
+        const results = searchData.results || [];
+
+        // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
+        const filteredResults = results.filter((r: any) => {
+          const url = (r.url || "").toLowerCase();
+          const title = (r.title || "").toLowerCase();
+          if (
+            url.includes("/faq") ||
+            url.includes("/customer") ||
+            url.includes("/main") ||
+            url.includes("/index") ||
+            url.includes("faqdetail") ||
+            url.includes("/qna") ||
+            url.includes("/eng/") ||
+            url.includes("/en/") ||
+            url.includes("corporate") ||
+            url.includes("ir-") ||
+            url.includes("growth-stage") ||
+            title.includes("annual report") ||
+            title.includes("investor")
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        finalResults = filteredResults.length > 0 ? filteredResults.slice(0, 4) : results.slice(0, 3);
+
+        if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
+          searchContext = finalResults.map((r: any, i: number) => {
+            const textContent = r.raw_content || r.content || "";
+            return `[검색 자료 ${i + 1}]
 제목: ${r.title}
 출처 주소: ${r.url}
 내용: ${textContent}`;
-        }).join("\n\n");
-      } else {
-        searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
+          }).join("\n\n");
+        } else {
+          searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
+        }
+      } catch (searchErr) {
+        console.warn("Tavily 검색 또는 파싱 중 오류 발생으로 OpenAI 사전 지식을 통한 폴백을 실행합니다:", searchErr);
+        searchContext = "Tavily 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
       }
-    } catch (searchErr) {
-      console.warn("Tavily 검색 또는 파싱 중 오류 발생으로 OpenAI 사전 지식을 통한 폴백을 실행합니다:", searchErr);
-      searchContext = "Tavily 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
     }
 
     // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
