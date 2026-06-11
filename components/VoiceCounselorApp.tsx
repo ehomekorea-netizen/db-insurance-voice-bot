@@ -332,6 +332,7 @@ export function VoiceCounselorApp() {
       setIsConnecting(false);
 
       // Play welcome greeting
+      addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
       await playTts("PA님 무엇을 도와드릴까요?");
 
       isPlayingAudio.current = false;
