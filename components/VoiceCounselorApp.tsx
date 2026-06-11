@@ -26,12 +26,6 @@ type RealtimeEvent = {
   arguments?: string;
 };
 
-const EXAMPLE_QUESTIONS = [
-  "교통사고로 입원하면 실손에서 보장되나요?",
-  "보험금 청구할 때 어떤 서류가 필요해요?",
-  "미용 목적 치료는 보상에서 제외되나요?"
-];
-
 export function VoiceCounselorApp() {
   const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -41,13 +35,14 @@ export function VoiceCounselorApp() {
   const [liveTranscript, setLiveTranscript] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sessionDuration, setSessionDuration] = useState(0);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "system",
       content:
-        "안녕하세요! DB손해보험 AI 보이스 상담원 프로미입니다. 실시간 음성 통화 및 대화를 통해 공식 약관을 확인해 보세요."
+        "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. 우측 상단의 [도움요청 🎙️] 버튼을 눌러 음성 상담을 시작하거나, 하단에 약관 질문을 텍스트로 입력해 주세요."
     }
   ]);
 
@@ -75,6 +70,22 @@ export function VoiceCounselorApp() {
       stopRealtime();
     }, 3 * 60 * 1000);
   };
+
+  // Monitor session duration
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (isConnected) {
+      setSessionDuration(0);
+      intervalId = setInterval(() => {
+        setSessionDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setSessionDuration(0);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isConnected]);
 
   // Monitor visibility state to disconnect WebRTC in background
   useEffect(() => {
@@ -128,7 +139,14 @@ export function VoiceCounselorApp() {
         void audio.play().catch(() => undefined);
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Explicitly enable echoCancellation and noiseSuppression to prevent feedback loops on mobile speakers
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
       streamRef.current = stream;
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -214,7 +232,6 @@ export function VoiceCounselorApp() {
     }
 
     if (event.type === "response.output_audio_transcript.done") {
-      // Append finalized speech text as a message bubble
       setLiveTranscript((finalText) => {
         const cleaned = finalText.trim();
         if (cleaned) {
@@ -357,8 +374,14 @@ export function VoiceCounselorApp() {
 
   function handleStartButtonClick() {
     setHasStartedConsultation(true);
-    void startRealtime();
+    // DO NOT start WebRTC automatically here to let user view UI first and grant microphone access via help button
   }
+
+  const formatDuration = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   function handleCopyText(msgId: string, question: string, ans: PolicyAnswer) {
     const conditionsText = ans.conditions && ans.conditions.length > 0
@@ -389,7 +412,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
     });
   }
 
-  // Cover Screen / Intro
+  // Cover Screen / Entrance - Revamped and brand aligned
   if (!hasStartedConsultation) {
     return (
       <main className="cover-shell">
@@ -397,13 +420,12 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
           <div className="promy-avatar-lg">
             <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
           </div>
-          <h1 className="cover-title">프로미 AI 보이스 상담봇</h1>
+          <h1 className="cover-title">동목포 부지점장</h1>
           <p className="cover-description">
-            DB손해보험 공식 공시실(판매/판매중지 상품) 검색 RAG 시스템.<br />
-            실시간 음성과 챗봇 통합 환경으로 빠르고 정확한 약관 조항을 조회합니다.
+            공식 상품 공시 자료 기반 약관 RAG 조회 시스템
           </p>
           <button className="primary-button start-consult-btn" onClick={handleStartButtonClick}>
-            프로미와 상담 시작하기 💬
+            상담 시작하기 💬
           </button>
         </div>
       </main>
@@ -418,26 +440,27 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
         <div className="messenger-brand">
           <img src="/promy.png" alt="PROMY" className="avatar-img" />
           <div>
-            <h2>프로미 AI 상담원</h2>
-            <span className={`messenger-status ${isConnected ? "online" : ""}`}>
-              {statusLabel}
-            </span>
+            <h2>동목포 부지점장</h2>
+            <div className="messenger-status-row">
+              <span className={`messenger-status ${isConnected ? "online" : ""}`}>
+                {statusLabel}
+              </span>
+              {isConnected && (
+                <span className="session-timer">
+                  [{formatDuration(sessionDuration)}]
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="messenger-header-actions">
           {!isConnected && !isConnecting ? (
-            <button className="primary-button call-btn-sm" onClick={startRealtime}>
-              <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27 11.72 11.72 0 003.74.6 1 1 0 011 1v3.5a1 1 0 01-1 1A16 16 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.72 11.72 0 00.6 3.74 1 1 0 01-.27 1.1l-2.2 2.2z" />
-              </svg>
-              음성 상담 연결
+            <button className="primary-button help-request-btn" onClick={startRealtime}>
+              도움요청 🎙️
             </button>
           ) : (
-            <button className="danger-button call-btn-sm" onClick={stopRealtime} disabled={isConnecting}>
-              <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 11h3v2h-3v3h-2v-3H8v-2h3V8h2v5z" transform="rotate(45 12 12)" />
-              </svg>
-              음성 연결 종료
+            <button className="danger-button help-request-btn" onClick={stopRealtime} disabled={isConnecting}>
+              {isConnecting ? "연결 중..." : "상담 종료 ✖"}
             </button>
           )}
         </div>
@@ -445,27 +468,35 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
 
       {/* Messages */}
       <section className="messenger-chat-area">
-        {messages.map((message) => (
-          <div key={message.id} className="message-wrapper">
-            {message.role === "assistant" && (
-              <div className="avatar-wrapper">
-                <img src="/promy.png" alt="PROMY" className="avatar-img" />
+        {messages.map((message) => {
+          const wrapperClass =
+            message.role === "user"
+              ? "user-wrapper"
+              : message.role === "system"
+              ? "system-wrapper"
+              : "assistant-wrapper";
+          return (
+            <div key={message.id} className={`message-wrapper ${wrapperClass}`}>
+              {message.role === "assistant" && (
+                <div className="avatar-wrapper">
+                  <img src="/promy.png" alt="PROMY" className="avatar-img" />
+                </div>
+              )}
+              <div className="bubble-wrapper">
+                {message.role === "assistant" && <span className="sender-name">프로미</span>}
+                <MessageBubble
+                  message={message}
+                  copiedId={copiedId}
+                  onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
+                />
               </div>
-            )}
-            <div className="bubble-wrapper">
-              {message.role === "assistant" && <span className="sender-name">프로미</span>}
-              <MessageBubble
-                message={message}
-                copiedId={copiedId}
-                onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
-              />
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Live speech transcript (Typing bubble) */}
         {liveTranscript && (
-          <div className="message-wrapper">
+          <div className="message-wrapper assistant-wrapper">
             <div className="avatar-wrapper">
               <img src="/promy.png" alt="PROMY" className="avatar-img" />
             </div>
@@ -481,7 +512,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
 
         {/* Searching Loader Card */}
         {isSearching && (
-          <div className="message-wrapper">
+          <div className="message-wrapper assistant-wrapper">
             <div className="avatar-wrapper">
               <img src="/promy.png" alt="PROMY" className="avatar-img" />
             </div>
@@ -510,22 +541,12 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}${citationsText
         <div ref={messagesEndRef} />
       </section>
 
-      {/* Guide & Composer */}
+      {/* Composer */}
       <footer className="messenger-footer-area">
-        {messages.length <= 2 && (
-          <div className="chat-quick-guide">
-            {EXAMPLE_QUESTIONS.map((q, idx) => (
-              <button key={idx} onClick={() => setInput(q)} className="guide-chip">
-                "{q}"
-              </button>
-            ))}
-          </div>
-        )}
         <form className="composer-form" onSubmit={submitTextQuestion}>
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder={isConnected ? "마이크로 직접 질문하시거나 여기에 질문을 입력하세요..." : "질문을 입력하세요..."}
             aria-label="약관 질문"
           />
           <button className="secondary-button send-btn" type="submit" disabled={!input.trim()}>
