@@ -664,30 +664,65 @@ function MessageBubble({
     return (
       <article className="message assistant answer-card">
         <div className="card-top">
-          <span className="card-logo-badge">DB손보</span>
-          <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Tavily"})</span>
+          <div className="card-top-left">
+            <span className="card-logo-badge">DB손보</span>
+            <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Google (Serper)"})</span>
+          </div>
           <button className="copy-action-btn" onClick={() => onCopy(ans)}>
-            {isCopied ? "복사 완료! ✔" : "📋 클립보드 복사"}
+            {isCopied ? "복사 완료! ✔" : (
+              <>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                복사
+              </>
+            )}
           </button>
         </div>
 
         {ans.analysis && (
           <div className="answer-section">
-            <h4 className="section-title analysis-style">🔍 질문 이해 및 분석 근거</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-analysis">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </span>
+              질문 이해 및 분석 근거
+            </h4>
             <p className="analysis-text" style={{ whiteSpace: "pre-line" }}>{ans.analysis}</p>
           </div>
         )}
 
         {ans.summary && (
           <div className="answer-section">
-            <h4 className="section-title summary-style">💡 핵심 요약</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-summary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
+                  <line x1="9" y1="18" x2="15" y2="18"></line>
+                  <line x1="10" y1="22" x2="14" y2="22"></line>
+                </svg>
+              </span>
+              핵심 답변 요약
+            </h4>
             <p className="summary-text">{ans.summary}</p>
           </div>
         )}
 
         {ans.conditions && ans.conditions.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title conditions-style">✅ 보장 대상 및 지급 조건</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-conditions">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <path d="m9 11 2 2 4-4"></path>
+                </svg>
+              </span>
+              보장 대상 및 지급 조건
+            </h4>
             <ul className="bullet-list green-theme">
               {ans.conditions.map((item, idx) => (
                 <li key={idx}>{item}</li>
@@ -698,7 +733,16 @@ function MessageBubble({
 
         {ans.cautions && ans.cautions.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title cautions-style">⚠️ 보장 제외 및 유의사항 (면책)</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-cautions">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </span>
+              보장 제외 및 유의사항 (면책)
+            </h4>
             <ul className="bullet-list orange-theme">
               {ans.cautions.map((item, idx) => (
                 <li key={idx}>{item}</li>
@@ -709,7 +753,17 @@ function MessageBubble({
 
         {ans.requiredInfo && ans.requiredInfo.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title info-style">📋 정확한 확인을 위해 필요한 정보</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
+              </span>
+              정확한 확인을 위해 필요한 정보
+            </h4>
             <ul className="bullet-list blue-theme">
               {ans.requiredInfo.map((item, idx) => (
                 <li key={idx}>{item}</li>
@@ -720,7 +774,15 @@ function MessageBubble({
 
         {ans.citations && ans.citations.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title citation-style">🔗 참고 출처 및 공시 자료</h4>
+            <h4 className="section-title">
+              <span className="icon-badge badge-citation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+              </span>
+              참고 출처 및 공시 자료
+            </h4>
             <ul style={{ listStyleType: "none", paddingLeft: 0, margin: "8px 0 0 0", display: "flex", flexDirection: "column", gap: "8px" }}>
               {ans.citations.map((citation) => (
                 <li key={citation.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", lineHeight: "1.4" }}>
