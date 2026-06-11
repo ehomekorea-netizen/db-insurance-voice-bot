@@ -80,68 +80,74 @@ export async function POST(request: Request) {
     const searchQuery = await generateSearchQuery(openai, question, productHint);
     console.log(`Tavily 검색 실행 (최적화): ${searchQuery}`);
 
-    const searchResponse = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        api_key: tavilyApiKey,
-        query: searchQuery,
-        search_depth: "advanced",
-        include_raw_content: true,
-        include_domains: ["idb.co.kr", "idbins.com", "disclosure.idbins.com", "fss.or.kr", "tistory.com", "naver.com"],
-        max_results: 5
-      })
-    });
-
-    if (!searchResponse.ok) {
-      const errText = await searchResponse.text();
-      throw new Error(`Tavily API responded with status ${searchResponse.status}: ${errText}`);
-    }
-
-    const searchData = await searchResponse.json();
-    const results = searchData.results || [];
-
-    // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
-    const filteredResults = results.filter((r: any) => {
-      const url = (r.url || "").toLowerCase();
-      const title = (r.title || "").toLowerCase();
-      // Filter out customer service main, FAQ pages, help pages, English pages, and IR files
-      if (
-        url.includes("/faq") ||
-        url.includes("/customer") ||
-        url.includes("/main") ||
-        url.includes("/index") ||
-        url.includes("faqdetail") ||
-        url.includes("/qna") ||
-        url.includes("/eng/") ||
-        url.includes("/en/") ||
-        url.includes("corporate") ||
-        url.includes("ir-") ||
-        url.includes("growth-stage") ||
-        title.includes("annual report") ||
-        title.includes("investor")
-      ) {
-        return false;
-      }
-      return true;
-    });
-
-    // Fallback to top result if everything got filtered out to prevent empty search
-    const finalResults = filteredResults.length > 0 ? filteredResults : results.slice(0, 1);
-
+    let finalResults: any[] = [];
     let searchContext = "";
-    if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
-      searchContext = finalResults.map((r: any, i: number) => {
-        const textContent = r.raw_content || r.content || "";
-        return `[검색 자료 ${i + 1}]
+
+    try {
+      const searchResponse = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          api_key: tavilyApiKey,
+          query: searchQuery,
+          search_depth: "advanced",
+          include_raw_content: true,
+          include_domains: ["idb.co.kr", "idbins.com", "disclosure.idbins.com", "fss.or.kr", "tistory.com", "naver.com"],
+          max_results: 3
+        })
+      });
+
+      if (!searchResponse.ok) {
+        const errText = await searchResponse.text();
+        throw new Error(`Tavily API responded with status ${searchResponse.status}: ${errText}`);
+      }
+
+      const searchData = await searchResponse.json();
+      const results = searchData.results || [];
+
+      // 2. Strict Ingestion Filtering: Remove generic/useless FAQ, English corporate pages, investor relations
+      const filteredResults = results.filter((r: any) => {
+        const url = (r.url || "").toLowerCase();
+        const title = (r.title || "").toLowerCase();
+        // Filter out customer service main, FAQ pages, help pages, English pages, and IR files
+        if (
+          url.includes("/faq") ||
+          url.includes("/customer") ||
+          url.includes("/main") ||
+          url.includes("/index") ||
+          url.includes("faqdetail") ||
+          url.includes("/qna") ||
+          url.includes("/eng/") ||
+          url.includes("/en/") ||
+          url.includes("corporate") ||
+          url.includes("ir-") ||
+          url.includes("growth-stage") ||
+          title.includes("annual report") ||
+          title.includes("investor")
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      finalResults = filteredResults.length > 0 ? filteredResults : results.slice(0, 1);
+
+      if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
+        searchContext = finalResults.map((r: any, i: number) => {
+          const textContent = r.raw_content || r.content || "";
+          return `[검색 자료 ${i + 1}]
 제목: ${r.title}
 출처 주소: ${r.url}
 내용: ${textContent}`;
-      }).join("\n\n");
-    } else {
-      searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
+        }).join("\n\n");
+      } else {
+        searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
+      }
+    } catch (searchErr) {
+      console.warn("Tavily 검색 또는 파싱 중 오류 발생으로 OpenAI 사전 지식을 통한 폴백을 실행합니다:", searchErr);
+      searchContext = "Tavily 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
     }
 
     // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
