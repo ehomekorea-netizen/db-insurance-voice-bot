@@ -152,7 +152,7 @@ export async function POST(request: Request) {
     console.log(`Jina Search 실행 (최적화): ${searchQuery}`);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for Jina
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for Jina
 
       const jinaQuery = `${searchQuery} (site:idb.co.kr OR site:idbins.com OR site:fss.or.kr OR site:knia.or.kr OR site:klia.or.kr OR site:ppomppu.co.kr OR site:clien.net OR site:bobaedream.co.kr OR site:dcinside.com OR site:naver.com OR site:tistory.com)`;
       
