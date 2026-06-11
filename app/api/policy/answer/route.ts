@@ -173,7 +173,7 @@ export async function POST(request: Request) {
 
       if (!searchResponse.ok) {
         const errText = await searchResponse.text();
-        throw new Error(`Jina API responded with status ${searchResponse.status}: ${errText}`);
+        throw new Error(`Status ${searchResponse.status}: ${errText.substring(0, 80).trim()}`);
       }
 
       const searchData = await searchResponse.json();
@@ -197,9 +197,10 @@ export async function POST(request: Request) {
       } else {
         searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
       }
-    } catch (searchErr) {
+    } catch (searchErr: any) {
+      const errMsg = searchErr instanceof Error ? searchErr.message : String(searchErr);
       console.warn("Jina 검색 중 오류 발생으로 자체 지식 분석으로 폴백합니다:", searchErr);
-      usedEngine = "자체 사전지식 (Jina 오류)";
+      usedEngine = `자체 사전지식 (Jina 오류: ${errMsg})`;
       searchContext = "Jina 검색 API의 지연 또는 일시적 오류로 인해 DB손해보험 약관에 대한 자체 지식 분석 결과를 제공합니다.";
     }
 
