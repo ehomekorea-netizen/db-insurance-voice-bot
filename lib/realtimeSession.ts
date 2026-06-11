@@ -24,6 +24,12 @@ export const realtimeSessionConfig = {
         voice: "marin"
       }
     },
+    turn_detection: {
+      type: "server_vad",
+      threshold: 0.85,
+      prefix_padding_ms: 300,
+      silence_duration_ms: 600
+    },
     tools: [
       {
         type: "function",

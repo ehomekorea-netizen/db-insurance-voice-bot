@@ -207,6 +207,13 @@ body {
   background: var(--accent-green);
 }
 
+.messenger-status.muted {
+  color: var(--accent-coral);
+}
+.messenger-status.muted::before {
+  background: var(--accent-coral);
+}
+
 .session-timer {
   font-size: 10px;
   font-weight: 800;

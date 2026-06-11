@@ -38,6 +38,20 @@ export function VoiceCounselorApp() {
   const [isSearching, setIsSearching] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+
+  const unmuteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  function setMicMuted(muted: boolean) {
+    setIsMicMuted(muted);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        if (track.kind === "audio") {
+          track.enabled = !muted;
+        }
+      });
+    }
+  }
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -229,6 +243,11 @@ export function VoiceCounselorApp() {
     processedCallIdsRef.current.clear();
     setIsConnected(false);
     setIsConnecting(false);
+    setIsMicMuted(false);
+    if (unmuteTimeoutRef.current) {
+      clearTimeout(unmuteTimeoutRef.current);
+      unmuteTimeoutRef.current = null;
+    }
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
@@ -253,11 +272,23 @@ export function VoiceCounselorApp() {
     // Handle session errors
     if (event.type === "error") {
       console.error("[Realtime Error]", event);
+      setMicMuted(false);
+    }
+
+    // Mute mic when AI response is created (begins generation/playback)
+    if (event.type === "response.created") {
+      if (unmuteTimeoutRef.current) {
+        clearTimeout(unmuteTimeoutRef.current);
+        unmuteTimeoutRef.current = null;
+      }
+      setMicMuted(true);
     }
 
     // Assistant speech: live delta
     if (event.type === "response.output_audio_transcript.delta" && event.delta) {
       setLiveTranscript((current) => `${current}${event.delta}`);
+      // Ensure mic is muted during speech playback
+      setMicMuted(true);
     }
 
     // Assistant speech: completed
@@ -268,6 +299,17 @@ export function VoiceCounselorApp() {
         addMessage({ role: "assistant", content: cleaned });
       }
       setLiveTranscript("");
+    }
+
+    // Response done: unmute mic after a brief delay to avoid speaker tail echo
+    if (event.type === "response.done") {
+      if (unmuteTimeoutRef.current) {
+        clearTimeout(unmuteTimeoutRef.current);
+      }
+      unmuteTimeoutRef.current = setTimeout(() => {
+        setMicMuted(false);
+        unmuteTimeoutRef.current = null;
+      }, 1000);
     }
 
     // User speech: live delta (real-time as user speaks)
@@ -489,8 +531,8 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           <div>
             <h2>동목포 부지점장</h2>
             <div className="messenger-status-row">
-              <span className={`messenger-status ${isConnected ? "online" : ""}`}>
-                {statusLabel}
+              <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
+                {isConnected && isMicMuted ? "🎙️ 프로미 답변 중 (음소거)" : statusLabel}
               </span>
               {isConnected && (
                 <span className="session-timer">
