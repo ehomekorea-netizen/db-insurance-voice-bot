@@ -281,11 +281,10 @@ export function VoiceCounselorApp() {
     try {
       const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
 
-      // Parallel run: play searching notification voice & request RAG response
-      const ttsPromise = playTts(searchSpeakText);
-      const apiPromise = requestPolicyAnswer(correctedQuestion);
-
-      const [, payload] = await Promise.all([ttsPromise, apiPromise]);
+      // Play searching notification voice in background (fire-and-forget, do not block RAG completion)
+      void playTts(searchSpeakText);
+      
+      const payload = await requestPolicyAnswer(correctedQuestion);
       setIsSearching(false);
 
       if (payload.isSimpleChat) {
@@ -446,10 +445,10 @@ export function VoiceCounselorApp() {
     try {
       const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
 
-      const ttsPromise = playTts(searchSpeakText);
-      const apiPromise = requestPolicyAnswer(question);
-
-      await Promise.all([ttsPromise, apiPromise]);
+      // Play searching notification voice in background (fire-and-forget)
+      void playTts(searchSpeakText);
+      
+      await requestPolicyAnswer(question);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "답변 생성에 실패했습니다.");
     } finally {
