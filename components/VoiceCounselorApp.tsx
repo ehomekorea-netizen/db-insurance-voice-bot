@@ -288,20 +288,22 @@ export function VoiceCounselorApp() {
     }
     setUserLiveTranscript("");
 
-    // Optimistically add user bubble
-    addMessage({ role: "user", content: question });
+    const correctedQuestion = correctSttErrors(question);
 
-    setActiveSearchQuery(question);
+    // Optimistically add user bubble
+    addMessage({ role: "user", content: correctedQuestion });
+
+    setActiveSearchQuery(correctedQuestion);
     setIsSearching(true);
     setError(null);
 
     try {
-      const keywords = extractKoreanKeywords(question);
+      const keywords = extractKoreanKeywords(correctedQuestion);
       const searchSpeakText = `${keywords} 관련 내용을 조회 중입니다.`;
 
       // Parallel run: play searching notification voice & request RAG response
       const ttsPromise = playTts(searchSpeakText);
-      const apiPromise = requestPolicyAnswer(question);
+      const apiPromise = requestPolicyAnswer(correctedQuestion);
 
       const [, payload] = await Promise.all([ttsPromise, apiPromise]);
       setIsSearching(false);
@@ -831,4 +833,22 @@ function extractKoreanKeywords(text: string): string {
   }
 
   return filtered.slice(0, 5).join(" ");
+}
+
+function correctSttErrors(text: string): string {
+  const corrections: Record<string, string> = {
+    "포장한도": "보장한도",
+    "포장 한도": "보장 한도",
+    "실소": "실손",
+    "실소보험": "실손보험",
+    "실선": "실손",
+    "실선보험": "실손보험",
+    "도수치로": "도수치료"
+  };
+  
+  let corrected = text;
+  for (const [key, value] of Object.entries(corrections)) {
+    corrected = corrected.replace(new RegExp(key, "g"), value);
+  }
+  return corrected;
 }
