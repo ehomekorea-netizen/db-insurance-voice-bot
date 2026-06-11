@@ -83,6 +83,7 @@ export function VoiceCounselorApp() {
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const optimisticMessageIdRef = useRef<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const isFinalEndingPending = useRef(false);
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -317,6 +318,7 @@ export function VoiceCounselorApp() {
     setIsConnected(false);
     setIsConnecting(false);
     setIsMicMuted(false);
+    isFinalEndingPending.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -402,6 +404,11 @@ export function VoiceCounselorApp() {
       unmuteTimeoutRef.current = setTimeout(() => {
         setMicMuted(false);
         unmuteTimeoutRef.current = null;
+
+        if (isFinalEndingPending.current) {
+          isFinalEndingPending.current = false;
+          stopRealtime();
+        }
       }, 1000);
 
       // Delayed cleanup for unresolved "음성 인식 중..." bubble
@@ -512,6 +519,8 @@ export function VoiceCounselorApp() {
       setIsSearching(false);
     }
 
+    isFinalEndingPending.current = true;
+
     sendRealtimeEvent({
       type: "conversation.item.create",
       item: {
@@ -519,7 +528,7 @@ export function VoiceCounselorApp() {
         call_id: callId,
         output: JSON.stringify({
           status: "sent_to_chat",
-          spoken_message: "요청하신 상세 약관 리포트 조회를 마쳤습니다. 대화창에 분석 결과를 전송해드렸습니다.",
+          spoken_message: "요청하신 상세 약관 리포트 조회를 마쳤습니다. 대화창에 분석 결과를 전송해드렸습니다. 답변 완료와 함께 음성 상담은 자동 종료됩니다.",
           chat_answer_id: answerPayload?.id || "error",
           citation_count: answerPayload?.citations?.length || 0
         })
@@ -530,7 +539,7 @@ export function VoiceCounselorApp() {
       type: "response.create",
       response: {
         instructions:
-          "도구 결과의 spoken_message만 한국어로 짧게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
+          "도구 결과의 spoken_message를 친절하고 명확하게 말하세요. 그 이외의 대답은 절대로 덧붙이지 마십시오."
       }
     });
   }
@@ -551,14 +560,15 @@ export function VoiceCounselorApp() {
       throw new Error("error" in payload && payload.error ? payload.error : "약관 답변 생성에 실패했습니다.");
     }
 
+    const contentText = isConnected
+      ? `${payload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
+      : payload.summary;
+
     addMessage({
       role: "assistant",
-      content: payload.summary,
+      content: contentText,
       answer: payload
     });
-
-    // Auto-disconnect voice session to save costs after rendering the RAG report
-    stopRealtime();
 
     return payload;
   }
