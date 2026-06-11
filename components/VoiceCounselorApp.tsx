@@ -91,24 +91,32 @@ export function VoiceCounselorApp() {
     return "음성 대기 중";
   }, [isConnecting, isConnected]);
 
-  // Reset inactivity timer (3 minutes auto-disconnect)
+  // Reset inactivity timer (20 seconds auto-disconnect for cost protection)
   const resetInactivityTimer = () => {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
     inactivityTimerRef.current = setTimeout(() => {
-      console.log("3분간 활동이 없어 음성 세션을 자동 차단합니다.");
+      console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
       stopRealtime();
-    }, 3 * 60 * 1000);
+      setError("20초 동안 대화가 없어 음성 상담이 자동으로 종료되었습니다.");
+    }, 20 * 1000);
   };
 
-  // Monitor session duration
+  // Monitor session duration & enforce 3-minute hard cap
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isConnected) {
       setSessionDuration(0);
       intervalId = setInterval(() => {
-        setSessionDuration((prev) => prev + 1);
+        setSessionDuration((prev) => {
+          if (prev >= 180) { // 3 minutes limit
+            stopRealtime();
+            setError("최대 상담 시간(3분)을 초과하여 음성 상담이 자동으로 종료되었습니다.");
+            return prev;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } else {
       setSessionDuration(0);
