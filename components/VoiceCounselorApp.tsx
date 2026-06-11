@@ -119,7 +119,9 @@ export function VoiceCounselorApp() {
       const tokenData = await tokenResponse.json();
 
       if (!tokenResponse.ok) {
-        throw new Error(tokenData.error ?? "Realtime token 발급에 실패했습니다.");
+        console.error("Token fetch failed:", tokenData);
+        const detailMsg = tokenData.detail?.error?.message || (tokenData.detail ? JSON.stringify(tokenData.detail) : "");
+        throw new Error(`${tokenData.error ?? "Realtime token 발급 실패"} ${detailMsg ? `(${detailMsg})` : ""}`);
       }
 
       const ephemeralKey = tokenData.value ?? tokenData.client_secret?.value;

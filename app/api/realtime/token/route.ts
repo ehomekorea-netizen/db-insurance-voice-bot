@@ -26,6 +26,7 @@ export async function POST(request: Request) {
   const data = await response.json();
 
   if (!response.ok) {
+    console.error("OpenAI client_secrets API failed:", response.status, data);
     return NextResponse.json(
       {
         error: "Failed to create Realtime client secret.",
