@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import crypto from "crypto";
 import { buildPolicyAnswer, classifyIntent, type PolicyIntent } from "@/lib/policyKnowledge";
 
 export const runtime = "nodejs";

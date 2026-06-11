@@ -39,6 +39,7 @@ export function VoiceCounselorApp() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -62,6 +63,12 @@ export function VoiceCounselorApp() {
     if (isConnected) return "실시간 음성 연결됨";
     return "음성 대기 중";
   }, [isConnecting, isConnected]);
+
+  const searchingMessage = useMemo(() => {
+    if (!activeSearchQuery) return "프로미가 DB손해보험 상품공시실에서 관련 약관을 조회하는 중입니다...";
+    const keywords = extractKoreanKeywords(activeSearchQuery);
+    return `프로미가 '${keywords}' 관련 약관 및 보장 여부를 DB손해보험 상품공시실에서 조회하는 중입니다...`;
+  }, [activeSearchQuery]);
 
   // Audio Playback with TTS
   async function playTts(text: string): Promise<void> {
@@ -284,6 +291,7 @@ export function VoiceCounselorApp() {
     // Optimistically add user bubble
     addMessage({ role: "user", content: question });
 
+    setActiveSearchQuery(question);
     setIsSearching(true);
     setError(null);
 
@@ -447,6 +455,7 @@ export function VoiceCounselorApp() {
     setError(null);
     addMessage({ role: "user", content: question });
 
+    setActiveSearchQuery(question);
     setIsSearching(true);
     try {
       await requestPolicyAnswer(question);
@@ -638,7 +647,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                     <span className="dot dot-2" />
                     <span className="dot dot-3" />
                   </div>
-                  <p>프로미가 DB손해보험 상품공시실에서 관련 약관을 조회하는 중입니다...</p>
+                  <p>{searchingMessage}</p>
                 </div>
               </div>
             </div>
@@ -795,4 +804,32 @@ function safeDecodeURIComponent(val: string): string {
 
 function isPolicyAnswer(value: PolicyAnswer | { error?: string }): value is PolicyAnswer {
   return "id" in value && "summary" in value && "citations" in value;
+}
+
+function extractKoreanKeywords(text: string): string {
+  const clean = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
+  const words = clean.split(/\s+/);
+  
+  const stopSuffixes = ["이랑", "이랑은", "이랑도", "은", "는", "이", "가", "을", "를", "에", "에서", "으로", "로", "와", "과", "도", "만", "의", "인", "인데", "해서", "되나요", "받을", "필요해", "뭐야", "알려줘", "알려주세요"];
+  const stopWords = ["둘", "다", "더", "또", "타고", "가다가", "넘어져서", "있어", "수", "할", "해", "한", "하", "뭐", "왜", "어떻게", "언제", "어디서"];
+
+  const filtered = words.map(word => {
+    let stripped = word;
+    for (const suffix of stopSuffixes) {
+      if (stripped.endsWith(suffix) && stripped.length > suffix.length) {
+        stripped = stripped.slice(0, -suffix.length);
+        break;
+      }
+    }
+    return stripped;
+  }).filter(word => {
+    const lower = word.toLowerCase();
+    return !stopWords.includes(lower) && lower.length >= 2;
+  });
+
+  if (filtered.length === 0) {
+    return text.substring(0, 15) + "...";
+  }
+
+  return filtered.slice(0, 5).join(" ");
 }
