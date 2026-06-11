@@ -19,7 +19,9 @@ export const REALTIME_SYSTEM_INSTRUCTIONS = `
 `;
 
 export const realtimeSessionConfig = {
-  model: REALTIME_MODEL
+  session: {
+    model: REALTIME_MODEL
+  }
 };
 
 export const fullRealtimeSessionConfig = {
