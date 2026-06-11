@@ -422,7 +422,7 @@ export function VoiceCounselorApp() {
         setTimeout(() => {
           isFinalEndingPending.current = false;
           stopRealtime();
-        }, 1500);
+        }, 3000);
         return;
       }
 
@@ -439,7 +439,7 @@ export function VoiceCounselorApp() {
           session: {
             turn_detection: {
               type: "server_vad",
-              threshold: 0.85,
+              threshold: 0.92,
               prefix_padding_ms: 300,
               silence_duration_ms: 1000
             }
@@ -541,7 +541,7 @@ export function VoiceCounselorApp() {
         call_id: callId,
         output: JSON.stringify({
           status: "sent_to_chat",
-          spoken_message: "요청하신 상세 약관 리포트 조회를 마쳤습니다. 대화창에 분석 결과를 전송해드렸습니다. 답변 완료와 함께 음성 상담은 자동 종료됩니다.",
+          spoken_message: "답변과 함께 상담은 자동종료됩니다.",
           chat_answer_id: answerPayload?.id || "error",
           citation_count: answerPayload?.citations?.length || 0
         })
