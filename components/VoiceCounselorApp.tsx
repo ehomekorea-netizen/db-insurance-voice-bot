@@ -330,7 +330,7 @@ export function VoiceCounselorApp() {
             ) : (
               <button className="danger-button hangup-btn" onClick={stopRealtime} disabled={isConnecting}>
                 <svg className="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 11h3v2h-3v3h-2v-3H8v-2h3V8h2v5z" transform="rotate(45 12 12)" />
                 </svg>
                 상담 종료
               </button>
