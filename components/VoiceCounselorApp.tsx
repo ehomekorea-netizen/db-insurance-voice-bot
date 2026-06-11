@@ -54,6 +54,7 @@ export function VoiceCounselorApp() {
   const dcRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const processedCallIdsRef = useRef<Set<string>>(new Set());
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "AI 상담원 호출 중...";
@@ -149,6 +150,7 @@ export function VoiceCounselorApp() {
     pcRef.current = null;
     streamRef.current = null;
     audioRef.current = null;
+    processedCallIdsRef.current.clear();
     setIsConnected(false);
     setIsConnecting(false);
   }
@@ -176,23 +178,42 @@ export function VoiceCounselorApp() {
       addMessage({ role: "user", content: event.transcript });
     }
 
-    const functionCall =
-      event.type === "response.output_item.done" && event.item?.type === "function_call"
-        ? event.item
-        : event.type === "response.function_call_arguments.done"
-          ? event
-          : null;
-
-    if (functionCall?.name === "prepare_policy_answer" && functionCall.call_id) {
-      void preparePolicyAnswer(functionCall.call_id, functionCall.arguments ?? "{}");
+    if (
+      event.type === "response.function_call_arguments.done" &&
+      event.name === "prepare_policy_answer" &&
+      event.call_id
+    ) {
+      void preparePolicyAnswer(event.call_id, event.arguments ?? "{}");
     }
   }
 
   async function preparePolicyAnswer(callId: string, rawArguments: string) {
+    if (processedCallIdsRef.current.has(callId)) return;
+    processedCallIdsRef.current.add(callId);
+
     const args = safeJsonParse<{ question?: string; intent?: PolicyIntent; product_hint?: string }>(rawArguments) ?? {};
     const question = args.question?.trim() || "사용자 약관 질문";
 
-    addMessage({ role: "user", content: question });
+    // Deduplicate user bubble: if transcription event already added it, don't duplicate.
+    setMessages((current) => {
+      const lastMsg = current[current.length - 1];
+      if (
+        lastMsg &&
+        lastMsg.role === "user" &&
+        (lastMsg.content.includes(question) || question.includes(lastMsg.content))
+      ) {
+        return current;
+      }
+      return [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: question
+        }
+      ];
+    });
+
     const answer = await requestPolicyAnswer(question, args.intent, args.product_hint);
 
     sendRealtimeEvent({
