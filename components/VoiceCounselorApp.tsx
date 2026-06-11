@@ -238,28 +238,6 @@ export function VoiceCounselorApp() {
               const currentLiveText = (interimTranscript || finalTranscript).trim();
               if (currentLiveText) {
                 setUserLiveTranscript(currentLiveText);
-
-                setMessages((current) => {
-                  let optimisticId = optimisticMessageIdRef.current;
-                  if (!optimisticId) {
-                    const lastMsg = current[current.length - 1];
-                    if (!lastMsg || lastMsg.role !== "user") {
-                      optimisticId = `optimistic-${Date.now()}`;
-                      optimisticMessageIdRef.current = optimisticId;
-                      return [
-                        ...current,
-                        { id: optimisticId, role: "user", content: currentLiveText }
-                      ];
-                    } else {
-                      optimisticId = lastMsg.id;
-                      optimisticMessageIdRef.current = optimisticId;
-                    }
-                  }
-
-                  return current.map((m) =>
-                    m.id === optimisticId ? { ...m, content: currentLiveText } : m
-                  );
-                });
               }
             };
 
@@ -340,6 +318,8 @@ export function VoiceCounselorApp() {
     setIsConnecting(false);
     setIsMicMuted(false);
     isFinalEndingPending.current = false;
+    setUserLiveTranscript("");
+    setLiveTranscript("");
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -384,23 +364,12 @@ export function VoiceCounselorApp() {
         unmuteTimeoutRef.current = null;
       }
       setMicMuted(true);
+      setUserLiveTranscript("");
     }
 
     // Create optimistic user bubble when user actually starts speaking
     if (event.type === "input_audio_buffer.speech_started") {
-      const optimisticId = `optimistic-${Date.now()}`;
-      optimisticMessageIdRef.current = optimisticId;
-      setMessages((current) => {
-        const lastMsg = current[current.length - 1];
-        if (lastMsg && lastMsg.role === "user") {
-          optimisticMessageIdRef.current = null;
-          return current;
-        }
-        return [
-          ...current,
-          { id: optimisticId, role: "user", content: "음성 인식 중..." }
-        ];
-      });
+      setUserLiveTranscript("음성 인식 중...");
     }
 
     // Assistant speech: live delta
@@ -420,7 +389,7 @@ export function VoiceCounselorApp() {
       setLiveTranscript("");
     }
 
-    // Response done: unmute mic and cleanup unresolved optimistic user bubble
+    // Response done: unmute mic
     if (event.type === "response.done") {
       if (unmuteTimeoutRef.current) {
         clearTimeout(unmuteTimeoutRef.current);
@@ -434,21 +403,6 @@ export function VoiceCounselorApp() {
           stopRealtime();
         }
       }, 1000);
-
-      // Delayed cleanup for unresolved "음성 인식 중..." bubble
-      setTimeout(() => {
-        setMessages((current) => {
-          const optimisticId = optimisticMessageIdRef.current;
-          if (optimisticId) {
-            const msg = current.find((m) => m.id === optimisticId);
-            if (msg && msg.content === "음성 인식 중...") {
-              optimisticMessageIdRef.current = null;
-              return current.filter((m) => m.id !== optimisticId);
-            }
-          }
-          return current;
-        });
-      }, 1500);
     }
 
     // User speech: live delta (real-time as user speaks)
@@ -456,25 +410,17 @@ export function VoiceCounselorApp() {
       setUserLiveTranscript((current) => `${current}${event.delta}`);
     }
 
-    // User speech: completed transcription - map to optimistic bubble
-    if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
+    // User speech: completed transcription
+    if (event.type === "conversation.item.input_audio_transcription.completed") {
       setUserLiveTranscript("");
-      const transcriptText = event.transcript.trim();
+      const transcriptText = (event.transcript || "").trim();
       if (transcriptText) {
         setMessages((current) => {
-          const optimisticId = optimisticMessageIdRef.current;
-          if (optimisticId && current.some((m) => m.id === optimisticId)) {
-            optimisticMessageIdRef.current = null;
-            return current.map((m) =>
-              m.id === optimisticId ? { ...m, content: transcriptText } : m
-            );
-          } else {
-            const hasExisting = current.some(
-              (m) => m.role === "user" && m.content === transcriptText
-            );
-            if (hasExisting) return current;
-            return [...current, { id: `user-${Date.now()}`, role: "user", content: transcriptText }];
+          const lastMsg = current[current.length - 1];
+          if (lastMsg && lastMsg.role === "user" && lastMsg.content === transcriptText) {
+            return current;
           }
+          return [...current, { id: `user-${Date.now()}`, role: "user", content: transcriptText }];
         });
       }
     }

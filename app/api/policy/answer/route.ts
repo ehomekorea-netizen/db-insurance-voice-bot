@@ -20,12 +20,18 @@ async function generateSearchQuery(openai: OpenAI, question: string, productHint
           role: "system",
           content: `You are a search query optimizer for Korean insurance policies.
 Analyze the user's question and product hint. Extract the key product name, coverage details, and terms.
-Generate a search query consisting of space-separated keywords that will find official Korean insurance policies on the web.
-Rules:
+Generate a search query consisting of space-separated keywords in Korean that will find official Korean insurance policies, old conditions, and expert explanations.
+
+Crucial Rules for Old/Discontinued Policies:
+- If the question or product hint refers to a discontinued product, old policy, specific past year (e.g., 2009년, 2017년), or past terms, you MUST explicitly append keywords like "과거 약관", "년도", "개정전", or "보장 분석".
+- Example 1: DB손해보험 (무)컨버전스보험 2009년 가입 약관 도수치료 보상 여부
+- Example 2: 2017년 4월 이전 DB손해 실손보험 해외의료비 보상 한도 약관
+
+General Rules:
 1. Output ONLY the optimized search keywords in Korean, separated by spaces.
 2. Do NOT use search operators like AND, OR, site:, or quotes.
-3. Keep the query under 5 words.
-4. Always prefix the query with "DB손해보험".
+3. Keep the query concise (typically under 7 words).
+4. Ensure "DB손해보험" or "DB손해" is present in the query.
 5. Do NOT include any conversational text.`
         },
         {
@@ -83,7 +89,8 @@ export async function POST(request: Request) {
         api_key: tavilyApiKey,
         query: searchQuery,
         search_depth: "advanced",
-        include_domains: ["idbins.com", "disclosure.idbins.com", "naver.com"],
+        include_raw_content: true,
+        include_domains: ["idb.co.kr", "idbins.com", "disclosure.idbins.com", "fss.or.kr", "tistory.com", "naver.com"],
         max_results: 5
       })
     });
@@ -125,15 +132,16 @@ export async function POST(request: Request) {
     const finalResults = filteredResults.length > 0 ? filteredResults : results.slice(0, 1);
 
     let searchContext = "";
-    if (finalResults.length > 0 && finalResults[0]?.content) {
+    if (finalResults.length > 0 && (finalResults[0]?.raw_content || finalResults[0]?.content)) {
       searchContext = finalResults.map((r: any, i: number) => {
-        return `[공식 공시자료 ${i + 1}]
+        const textContent = r.raw_content || r.content || "";
+        return `[검색 자료 ${i + 1}]
 제목: ${r.title}
 출처 주소: ${r.url}
-내용: ${r.content}`;
+내용: ${textContent}`;
       }).join("\n\n");
     } else {
-      searchContext = "DB손해보험 상품공시실에서 해당 조건의 구체적인 약관 원문 조항을 찾지 못했습니다.";
+      searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했습니다.";
     }
 
     // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
@@ -144,13 +152,14 @@ export async function POST(request: Request) {
           role: "system",
           content: `당신은 DB손해보험의 공식 상품 약관, 담보 보상여부, 청구서류 및 보험 업무 전반을 전문적으로 해설하는 AI 언더라이터이자 보상 전문가입니다.
 사용자는 보험 설계사 또는 지점 임직원(보험 전문가)입니다. 
-제공된 [공식 공시자료] 및 검색된 보험 지식자료를 면밀히 추론/분석하여 사용자의 질문에 답변하십시오. 
+제공된 [검색 및 공시자료]를 면밀히 추론/분석하여 사용자의 질문에 답변하십시오. 
 
 [답변 작성 원칙]
 - 대화체나 존댓말을 장황하게 쓰지 말고, 공문서나 보고서 스타일로 전문 용어(면책, 자기부담금, 공제율, 특약, 구비서류 등)를 사용하여 핵심만 명확하게 작성하십시오.
 - 사용자가 확인해 준 가입 연도나 판매유무(판매상품/판매중지) 단서가 있다면, 해당 약관 및 보상 시점을 기준으로 정확히 보상 범위나 구비서류를 추론하여 작성하십시오.
 - 제공된 자료 상에서 특정 정보가 확실하지 않다면, 추론 과정과 한계(예: "공시자료상 2009년 표준화 이전 상해의료비 세부 공제 비율은 확인되지 않음")를 솔직하게 명시하고, [확인 필요 사항]에 구체적으로 적어 넣으십시오.
 - 절대 임의로 답변을 꾸며내지 마십시오.
+- 검색 결과 중 블로그 글(naver.com, tistory.com 등)은 반드시 여러 출처에서 교차 검증된 객관적인 사실과 내용만 답변에 채택하여 사용하십시오.
 
 반드시 아래의 [응답 형식]을 엄격하게 준수하여 대괄호 제목과 줄바꿈을 활용하십시오.
 
@@ -166,7 +175,7 @@ export async function POST(request: Request) {
 - 보상 제외 대상(면책 조항), 한도 제한, 지급 거절 요인 등을 약관 기준으로 상세히 기재하십시오.
 - 찾지 못했다면 이 항목을 생략하십시오.
 
-[공식 공시자료]
+[검색 및 공시자료]
 ${searchContext}`
         },
         {
@@ -221,7 +230,7 @@ ${searchContext}`
         page: 1,
         version: productHint || "공식 공시 정보",
         sourceUrl: r.url || "https://disclosure.idbins.com/",
-        excerpt: (r.content || "").substring(0, 200) + "..."
+        excerpt: (r.raw_content || r.content || "").substring(0, 200) + "..."
       }));
 
     return NextResponse.json({
