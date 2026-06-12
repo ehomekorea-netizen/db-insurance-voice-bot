@@ -826,6 +826,34 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
   );
 }
 
+// Helper to parse double asterisks (e.g. **bold**) and render them as JSX strong tags with soft brand blue highlight
+function renderFormattedText(text: string | undefined) {
+  if (!text) return null;
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      const cleanText = part.slice(2, -2);
+      return (
+        <strong
+          key={index}
+          style={{
+            fontWeight: "700",
+            color: "#0f172a",
+            backgroundColor: "rgba(37, 99, 235, 0.08)",
+            borderBottom: "1.5px solid rgba(37, 99, 235, 0.3)",
+            padding: "0 4px",
+            borderRadius: "3px",
+            margin: "0 2px"
+          }}
+        >
+          {cleanText}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 function MessageBubble({
   message,
   copiedId,
@@ -869,7 +897,9 @@ function MessageBubble({
               </span>
               질문 이해 및 분석 근거
             </h4>
-            <p className="analysis-text" style={{ whiteSpace: "pre-line" }}>{ans.analysis}</p>
+            <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", color: "#334155" }}>
+              {renderFormattedText(ans.analysis)}
+            </p>
           </div>
         )}
 
@@ -885,7 +915,9 @@ function MessageBubble({
               </span>
               핵심 답변 요약
             </h4>
-            <p className="summary-text">{ans.summary}</p>
+            <p className="summary-text" style={{ lineHeight: "1.6", color: "#0f172a", fontWeight: "500" }}>
+              {renderFormattedText(ans.summary)}
+            </p>
           </div>
         )}
 
@@ -902,7 +934,7 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list green-theme">
               {ans.conditions.map((item, idx) => (
-                <li key={idx}>{item}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
               ))}
             </ul>
           </div>
@@ -922,7 +954,7 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list orange-theme">
               {ans.cautions.map((item, idx) => (
-                <li key={idx}>{item}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
               ))}
             </ul>
           </div>
@@ -943,7 +975,7 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list blue-theme">
               {ans.requiredInfo.map((item, idx) => (
-                <li key={idx}>{item}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
               ))}
             </ul>
           </div>
