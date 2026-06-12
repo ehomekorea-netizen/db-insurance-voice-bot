@@ -40,3 +40,8 @@
 - `[x]` 15. Integrate fuzzy corrector in `app/api/policy/answer/route.ts`
 - `[x]` 16. Verify full Next.js project compilation using `npm run build`
 - `[x]` 17. Commit and push changes to GitHub
+
+## Phase 5: Jina Reader Real-time Web/PDF Scraping Pipeline
+- `[x]` 18. Implement Jina Reader scraping logic in `app/api/policy/answer/route.ts` with parallel fetch, timeouts, and token truncation
+- `[x]` 19. Verify compilation and test using `npm run build`
+- `[x]` 20. Commit and push changes to GitHub

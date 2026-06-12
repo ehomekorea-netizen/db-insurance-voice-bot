@@ -12,6 +12,38 @@ type PolicyAnswerRequest = {
   product_hint?: string;
 };
 
+// Real-time webpage/PDF scraper via Jina Reader API
+async function scrapeUrl(url: string, apiKey?: string): Promise<string> {
+  if (!url) return "";
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // Strict 3.5s timeout for scraping
+    
+    const headers: Record<string, string> = {
+      "Accept": "text/plain"
+    };
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+    
+    const response = await fetch(`https://r.jina.ai/${url}`, {
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.warn(`[Jina Reader] Failed to scrape ${url}: HTTP ${response.status}`);
+      return "";
+    }
+    const text = await response.text();
+    return text.substring(0, 8000); // Truncate content to first 8,000 characters to prevent prompt bloat
+  } catch (err) {
+    console.warn(`[Jina Reader] Error scraping ${url}:`, err);
+    return "";
+  }
+}
+
 // Preprocess conversational user question into optimized Korean search keywords
 async function generateSearchQuery(openai: OpenAI, question: string, currentDate: string, productHint?: string): Promise<string> {
   try {
@@ -259,7 +291,8 @@ export async function POST(request: Request) {
         });
       }
 
-      // 3. Capture Organic Results
+      // 3. Capture Organic Results & Scrape Top 2 pages in parallel
+      let scrapedSections: string[] = [];
       if (organicResults.length > 0) {
         const organicMapped = organicResults.slice(0, 4).map((r: any) => ({
           title: r.title || "참고자료",
@@ -268,6 +301,35 @@ export async function POST(request: Request) {
           raw_content: r.snippet || ""
         }));
         parsedResults.push(...organicMapped);
+
+        // Scrape top 2 URLs in parallel using Jina Reader
+        const scrapeTargets = organicResults.slice(0, 2);
+        console.log(`[Jina Reader] 상위 ${scrapeTargets.length}개 링크 실시간 본문 스크래핑 시작...`);
+        const jinaApiKey = process.env.JINA_API_KEY;
+        
+        try {
+          const scrapedContents = await Promise.all(
+            scrapeTargets.map((r: any) => scrapeUrl(r.link, jinaApiKey))
+          );
+          
+          scrapedContents.forEach((content, idx) => {
+            const target = scrapeTargets[idx];
+            if (content && content.trim()) {
+              console.log(`[Jina Reader] 스크래핑 성공: ${target.link} (${content.length}자)`);
+              scrapedSections.push(`[공식 문서 실시간 분석 자료 ${idx + 1}]
+출처 주소: ${target.link}
+제목: ${target.title}
+상세 본문 내용:
+${content}`);
+            }
+          });
+        } catch (scrapeErr) {
+          console.warn("[Jina Reader] 실시간 스크래핑 중 에러 발생:", scrapeErr);
+        }
+      }
+
+      if (scrapedSections.length > 0) {
+        extraContext += `[구글 실시간 공식 문서 스크래핑 결과]\n${scrapedSections.join("\n\n")}\n\n`;
       }
 
       if (parsedResults.length > 0) {
