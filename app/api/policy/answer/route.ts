@@ -151,8 +151,9 @@ export async function POST(request: Request) {
       }
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+    let modelName = "gemini-2.5-flash";
+    let response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,9 +161,23 @@ export async function POST(request: Request) {
       }
     );
 
+    // 503 Unavailable (High Demand) 또는 기타 API 에러 발생 시, 검증된 gemini-1.5-flash로 자동 폴백 재시도
+    if (response.status === 503 || !response.ok) {
+      console.warn(`[Gemini API Warning] ${modelName} 호출 실패(HTTP ${response.status}). 안정화된 gemini-1.5-flash로 즉시 우회 재시도합니다.`);
+      modelName = "gemini-1.5-flash";
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        }
+      );
+    }
+
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Gemini API HTTP ${response.status}: ${errText}`);
+      throw new Error(`Gemini API HTTP ${response.status} (Model: ${modelName}): ${errText}`);
     }
 
     const data = await response.json();
@@ -231,8 +246,8 @@ export async function POST(request: Request) {
     });
 
     const usedEngine = groundingChunks.length > 0
-      ? (localChunks.length > 0 ? "로컬 약관 + Google Search" : "Google Search")
-      : (localChunks.length > 0 ? "로컬 약관 지식베이스" : "Gemini 2.5 Flash");
+      ? (localChunks.length > 0 ? `로컬 약관 + Google Search (${modelName})` : `Google Search (${modelName})`)
+      : (localChunks.length > 0 ? `로컬 약관 지식베이스` : `Gemini (${modelName})`);
 
     return NextResponse.json({
       id: crypto.randomUUID(),
