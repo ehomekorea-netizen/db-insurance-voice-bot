@@ -925,7 +925,7 @@ function MessageBubble({
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
                 </span>
-                <span style={{ fontWeight: "800" }}>질문 이해 및 분석 근거</span>
+                <span style={{ fontWeight: "800" }}>질문 이해 및 분석근거</span>
               </div>
               <span
                 style={{
@@ -941,7 +941,7 @@ function MessageBubble({
                   border: "1px solid rgba(37, 99, 235, 0.2)"
                 }}
               >
-                {isExpanded ? "분석 내용 접기 🔼" : "상세 분석 보기 (클릭) 👉"}
+                {isExpanded ? "내용접기▲" : "내용열기▼"}
               </span>
             </h4>
             {isExpanded && (

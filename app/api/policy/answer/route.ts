@@ -186,6 +186,32 @@ export async function POST(request: Request) {
     const groundingMetadata = data.candidates?.[0]?.groundingMetadata || {};
     const groundingChunks = groundingMetadata.groundingChunks || [];
     
+    const getCleanTitle = (title: string, url: string): string => {
+      const clean = title.trim();
+      const isDomainPattern = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:\d+)?$/.test(clean) || clean.toLowerCase().startsWith("http");
+      
+      if (!clean || isDomainPattern) {
+        const lowUrl = url.toLowerCase();
+        if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손해보험 공식 상품공시실 및 약관 정보";
+        if (lowUrl.includes("fss.or.kr")) return "금융감독원 공식 보험분쟁 조정사례 및 규정";
+        if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) return "손해보험협회 표준약관 및 제도 안내";
+        if (lowUrl.includes("signalplanner.co.kr")) return "시그널플래너 실손/수술비 보험 가이드 및 지급사례";
+        if (lowUrl.includes("kbthink.com")) return "KB손해보험 공식 지식 블로그 - 실손보험금 청구 기준";
+        if (lowUrl.includes("son4.net")) return "손사넷 손해사정사 전문 보상 분쟁 및 판례 해설";
+        if (lowUrl.includes("naver.com")) return "네이버 지식iN / 블로그 보험 보상 청구 가이드";
+        if (lowUrl.includes("tistory.com")) return "보상 실무 전문가 티스토리 블로그 정보";
+        if (lowUrl.includes("brunch.co.kr")) return "브런치 보험 전문 작가 칼럼 및 보상 리뷰";
+        
+        try {
+          const hostname = new URL(url).hostname.replace("www.", "");
+          return `${hostname} 전문 정보 및 해설`;
+        } catch {
+          return "실시간 검색 참조 자료";
+        }
+      }
+      return clean;
+    };
+
     const citations = groundingChunks.slice(0, 5).map((chunk: any, i: number) => {
       const web = chunk.web || {};
       const url = web.uri || "https://disclosure.idbins.com/";
@@ -199,14 +225,16 @@ export async function POST(request: Request) {
         return "참고자료";
       };
 
+      const resolvedTitle = getCleanTitle(web.title || "", url);
+
       return {
         id: `citation-${i + 1}-${crypto.randomUUID().substring(0, 8)}`,
-        title: web.title || "DB손해보험 공식 공시실",
+        title: resolvedTitle,
         section: getCitationSection(url),
         page: 1,
         version: productHint || "공식 정보",
         sourceUrl: url,
-        excerpt: web.title || "실시간 검색 출처"
+        excerpt: resolvedTitle
       };
     });
 
