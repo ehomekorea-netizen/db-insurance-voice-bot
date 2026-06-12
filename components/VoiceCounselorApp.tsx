@@ -1118,21 +1118,21 @@ function MessageBubble({
         <div className="welcome-banner-card">
           <div className="welcome-banner-header">
             <span className="welcome-banner-badge">GUIDE</span>
-            <h4>동목포 부지점장 프로미의 약관 안내</h4>
+            <h4>동목포 오멘토의 영업 & 보장분석 코칭</h4>
           </div>
           <div className="welcome-banner-body">
-            <p className="welcome-greet">반갑습니다 PA님! DB손해보험 부지점장 프로미입니다. 😊</p>
+            <p className="welcome-greet">반갑습니다 PA님! 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
             <p className="welcome-instruction">
-              우측 상단의 <strong className="highlight-text">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어 약관 조회 및 보장 조건에 대해 대화로 편하게 안내받으실 수 있습니다.
+              우측 상단의 <strong className="highlight-text-green">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어 약관 조회 및 영업 보장 조건에 대해 편하게 코칭을 받으실 수 있습니다.
             </p>
             <div className="welcome-features">
               <div className="feature-item">
                 <span className="feature-dot"></span>
-                <span><strong>음성 인식 보정:</strong> "2번비", "수치료", "포장" 등 전사 오류도 올바른 용어(입원비, 도수치료, 보장)로 자동 보정됩니다.</span>
+                <span>보상 규정 및 주요 면책 조건에 대해 쉽게 설명해 드립니다.</span>
               </div>
               <div className="feature-item">
                 <span className="feature-dot"></span>
-                <span><strong>실시간 구글 검색:</strong> 최신 DB손보 공식 공시 자료와 규정을 Google Search로 정밀 검색합니다.</span>
+                <span>PA님의 영업 성공을 위해 약관 해석 및 영업 화법을 코칭해 드립니다.</span>
               </div>
             </div>
           </div>

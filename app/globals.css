@@ -1014,12 +1014,16 @@ body {
   color: #475569;
 }
 
-.welcome-instruction .highlight-text {
-  color: var(--accent-coral);
-  background: rgba(232, 111, 74, 0.08);
-  padding: 2px 4px;
-  border-radius: 4px;
+.welcome-instruction .highlight-text-green {
+  color: var(--accent-green);
+  background: rgba(47, 118, 109, 0.1);
+  border: 1px solid rgba(47, 118, 109, 0.25);
+  padding: 3px 6px;
+  border-radius: 6px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .welcome-features {
