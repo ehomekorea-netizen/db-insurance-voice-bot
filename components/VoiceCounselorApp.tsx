@@ -714,12 +714,12 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           <div className="promy-avatar-lg">
             <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
           </div>
-          <h1 className="cover-title">동목포 부지점장</h1>
+          <h1 className="cover-title">동목포 오멘토</h1>
           <p className="cover-description">
-            공식 상품 공시 자료 기반 약관 RAG 조회 시스템
+            동목포 PA님들의 영업을 지원하는 멘토
           </p>
           <button className="primary-button start-consult-btn" onClick={handleStartButtonClick}>
-            상담 시작하기 💬
+            상담 시작하기 <span className="btn-arrow">➔</span>
           </button>
         </div>
       </main>
@@ -734,7 +734,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         <div className="messenger-brand">
           <img src="/promy.png" alt="PROMY" className="avatar-img" />
           <div>
-            <h2>동목포 부지점장</h2>
+            <h2>동목포 오멘토</h2>
             <div className="messenger-status-row">
               <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
                 {isConnected && isMicMuted ? "🎙️ 프로미 답변 중 (음소거)" : statusLabel}
@@ -800,7 +800,15 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             <div className="bubble-wrapper">
               <span className="sender-name">나 (말하는 중)</span>
               <div className="message user-bubble live-typing-bubble">
-                <span className="live-transcript-tag">🎙️ 음성 인식 중</span>
+                <div className="live-transcript-header">
+                  <span className="live-transcript-tag">🎙️ 음성 인식 중</span>
+                  <div className="voice-eq-waves">
+                    <span className="wave-bar wave-bar-1"></span>
+                    <span className="wave-bar wave-bar-2"></span>
+                    <span className="wave-bar wave-bar-3"></span>
+                    <span className="wave-bar wave-bar-4"></span>
+                  </div>
+                </div>
                 <p>{userLiveTranscript}</p>
               </div>
             </div>
