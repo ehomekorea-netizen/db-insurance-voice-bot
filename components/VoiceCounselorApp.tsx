@@ -321,13 +321,19 @@ export function VoiceCounselorApp() {
   async function startRealtime() {
     setError(null);
     setIsConnecting(true);
-    isPlayingAudio.current = true;
 
     try {
+      // 1. Request microphone permission first to unlock mobile audio context and ask for consent immediately
+      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop()); // Immediately release the stream
+      }
+
       setIsConnected(true);
       setIsConnecting(false);
+      isPlayingAudio.current = true;
 
-      // Play welcome greeting
+      // 2. Play welcome greeting after permission is granted
       addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
       await playTts("PA님 무엇을 도와드릴까요?");
 
@@ -338,7 +344,13 @@ export function VoiceCounselorApp() {
     } catch (cause) {
       stopRealtime();
       setIsConnecting(false);
-      setError(cause instanceof Error ? cause.message : "Realtime 연결에 실패했습니다.");
+      setError(
+        cause instanceof Error && (cause.name === "NotAllowedError" || cause.name === "PermissionDeniedError")
+          ? "마이크 사용 권한이 거부되었습니다. 설정에서 마이크를 허용한 뒤 다시 도움요청을 눌러주세요."
+          : cause instanceof Error
+          ? cause.message
+          : "마이크 연결에 실패했습니다."
+      );
     }
   }
 
@@ -349,8 +361,13 @@ export function VoiceCounselorApp() {
     }
 
     if (recognitionRef.current) {
+      const rec = recognitionRef.current;
+      // Detach all event handlers to avoid race conditions and background restarts
+      rec.onresult = null;
+      rec.onerror = null;
+      rec.onend = null;
       try {
-        recognitionRef.current.abort();
+        rec.abort();
       } catch {}
       recognitionRef.current = null;
     }
