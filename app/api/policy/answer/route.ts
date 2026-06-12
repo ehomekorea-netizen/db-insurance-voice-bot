@@ -59,6 +59,7 @@ export async function POST(request: Request) {
     // Local knowledge base chunk integration removed per client request.
 
     // 2. Query Gemini API with built-in Google Search Grounding tool
+    const useWebSearch = process.env.ENABLE_OFFICIAL_WEB_SEARCH !== "false";
     const requestBody = {
       contents: [
         {
@@ -70,11 +71,11 @@ export async function POST(request: Request) {
           ]
         }
       ],
-      tools: [
+      tools: useWebSearch ? [
         {
           googleSearch: {}
         }
-      ],
+      ] : undefined,
       systemInstruction: {
         parts: [
           {
