@@ -854,6 +854,18 @@ function renderFormattedText(text: string | undefined) {
   });
 }
 
+function cleanListText(text: string | undefined): string {
+  if (!text) return "";
+  let cleaned = text.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/g, "").trim();
+  if (cleaned.startsWith("* ")) {
+    cleaned = cleaned.substring(2).trim();
+  }
+  if (cleaned.startsWith("- ")) {
+    cleaned = cleaned.substring(2).trim();
+  }
+  return cleaned;
+}
+
 function MessageBubble({
   message,
   copiedId,
@@ -888,7 +900,59 @@ function MessageBubble({
           </button>
         </div>
 
-
+        {/* 질문 이해 및 분석 근거 (최상단 아코디언 배치) */}
+        {ans.analysis && (
+          <div className="answer-section">
+            <h4
+              className="section-title accordion-header"
+              onClick={() => setIsExpanded(!isExpanded)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                backgroundColor: isExpanded ? "rgba(37, 99, 235, 0.03)" : "transparent",
+                transition: "background-color 0.2s"
+              }}
+              title="클릭하여 분석 근거 상세 보기"
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span className="icon-badge badge-analysis">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+                <span style={{ fontWeight: "800" }}>질문 이해 및 분석 근거</span>
+              </div>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "#2563eb",
+                  fontWeight: "750",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "2px",
+                  backgroundColor: "rgba(37, 99, 235, 0.08)",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  border: "1px solid rgba(37, 99, 235, 0.2)"
+                }}
+              >
+                {isExpanded ? "분석 내용 접기 🔼" : "상세 분석 보기 (클릭) 👉"}
+              </span>
+            </h4>
+            {isExpanded && (
+              <div style={{ marginTop: "4px" }}>
+                <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.65", color: "#334155" }}>
+                  {renderFormattedText(ans.analysis)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {ans.summary && (
           <div className="answer-section">
@@ -921,7 +985,7 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list green-theme">
               {ans.conditions.map((item, idx) => (
-                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(cleanListText(item))}</li>
               ))}
             </ul>
           </div>
@@ -941,74 +1005,13 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list orange-theme">
               {ans.cautions.map((item, idx) => (
-                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(cleanListText(item))}</li>
               ))}
             </ul>
           </div>
         )}
 
-        {/* 4. 질문 이해 및 분석 근거 (접이식 아코디언) */}
-        {ans.analysis && (
-          <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-analysis">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </span>
-              질문 이해 및 분석 근거
-            </h4>
-            <div style={{ marginTop: "4px" }}>
-              {isExpanded ? (
-                <>
-                  <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.65", color: "#334155" }}>
-                    {renderFormattedText(ans.analysis)}
-                  </p>
-                  <button
-                    onClick={() => setIsExpanded(false)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#2563eb",
-                      fontSize: "12px",
-                      fontWeight: "600",
-                      cursor: "pointer",
-                      padding: "8px 0 0 0",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "2px"
-                    }}
-                  >
-                    상세 근거 접기 🔼
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsExpanded(true)}
-                  style={{
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    color: "#475569",
-                    fontSize: "12.5px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    width: "100%",
-                    justifyContent: "center",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  상세 분석 근거 보기 🔽
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+
 
         {ans.requiredInfo && ans.requiredInfo.length > 0 && (
           <div className="answer-section">
@@ -1025,7 +1028,7 @@ function MessageBubble({
             </h4>
             <ul className="bullet-list blue-theme">
               {ans.requiredInfo.map((item, idx) => (
-                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(item)}</li>
+                <li key={idx} style={{ lineHeight: "1.5" }}>{renderFormattedText(cleanListText(item))}</li>
               ))}
             </ul>
           </div>
@@ -1042,36 +1045,29 @@ function MessageBubble({
               </span>
               참고 출처 및 공시 자료
             </h4>
-            <ul style={{ listStyleType: "none", paddingLeft: 0, margin: "8px 0 0 0", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
               {ans.citations.map((citation) => (
-                <li key={citation.id} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", lineHeight: "1.4" }}>
-                  <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#f1f5f9", color: "#475569", fontSize: "10px", fontWeight: "bold", border: "1px solid #e2e8f0", flexShrink: 0 }}>
-                    {citation.section || "공시자료"}
+                <a
+                  key={citation.id}
+                  href={citation.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="citation-headline-link"
+                >
+                  <span className="citation-badge">
+                    {citation.section || "출처"}
                   </span>
-                  <a
-                    href={citation.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: "#2563eb",
-                      textDecoration: "underline",
-                      fontWeight: "600",
-                      wordBreak: "break-all",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "3px"
-                    }}
-                  >
+                  <span className="citation-title-text">
                     {safeDecodeURIComponent(citation.title)}
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                    </svg>
-                  </a>
-                </li>
+                  </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="citation-link-icon">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                </a>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 

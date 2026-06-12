@@ -168,19 +168,25 @@ export async function POST(request: Request) {
     if (conditionsStart !== -1) {
       const end = cautionsStart !== -1 ? cautionsStart : responseText.length;
       const rawConditions = responseText.substring(conditionsStart + 4, end).trim();
-      conditions = rawConditions.split("\n").map((l: string) => l.replace(/^-\s*/, "").trim()).filter(Boolean);
+      conditions = rawConditions
+        .split("\n")
+        .map((l: string) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+        .filter(Boolean);
     }
 
     if (cautionsStart !== -1) {
       const rawCautions = responseText.substring(cautionsStart + 6).trim();
-      cautions = rawCautions.split("\n").map((l: string) => l.replace(/^-\s*/, "").trim()).filter(Boolean);
+      cautions = rawCautions
+        .split("\n")
+        .map((l: string) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+        .filter(Boolean);
     }
 
-    // 4. Extract search grounding citations
+    // 4. Extract search grounding citations (최대 5개 한정)
     const groundingMetadata = data.candidates?.[0]?.groundingMetadata || {};
     const groundingChunks = groundingMetadata.groundingChunks || [];
     
-    const citations = groundingChunks.map((chunk: any, i: number) => {
+    const citations = groundingChunks.slice(0, 5).map((chunk: any, i: number) => {
       const web = chunk.web || {};
       const url = web.uri || "https://disclosure.idbins.com/";
       
