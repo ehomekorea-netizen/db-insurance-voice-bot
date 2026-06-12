@@ -26,6 +26,11 @@ export function VoiceCounselorApp() {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
+  const userLiveTranscriptRef = useRef("");
+  useEffect(() => {
+    userLiveTranscriptRef.current = userLiveTranscript;
+  }, [userLiveTranscript]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -42,6 +47,14 @@ export function VoiceCounselorApp() {
   const isPlayingAudio = useRef(false);
   const isFinalEndingPending = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Web Audio API VAD Refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const vadRafIdRef = useRef<number | null>(null);
+  const lastActiveTimeRef = useRef<number>(Date.now());
+  const hasSpokenRef = useRef<boolean>(false);
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -108,6 +121,141 @@ export function VoiceCounselorApp() {
       setLiveTranscript("");
       isPlayingAudio.current = false;
     }
+  }
+
+  // Local static guide audio immediate play
+  function playLocalGuideAudio() {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    
+    const randomIdx = Math.floor(Math.random() * 3) + 1; // 1, 2, 3
+    const guideFile = `/audio/guide_${randomIdx}.mp3`;
+    
+    isPlayingAudio.current = true;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+
+    const audio = new Audio(guideFile);
+    activeAudioRef.current = audio;
+    
+    const guideTexts: Record<number, string> = {
+      1: "네, PA님! 금방 약관을 조회해 드릴게요.",
+      2: "약관 내용을 분석하고 있습니다. 잠시만 기다려 주세요.",
+      3: "해당 보장 조항을 검색 중입니다. 잠시만요."
+    };
+    setLiveTranscript(guideTexts[randomIdx] || "조회 중입니다. 잠시만 기다려 주세요.");
+
+    audio.onended = () => {
+      activeAudioRef.current = null;
+      setLiveTranscript("");
+      isPlayingAudio.current = false;
+    };
+    audio.onerror = () => {
+      activeAudioRef.current = null;
+      setLiveTranscript("");
+      isPlayingAudio.current = false;
+    };
+    
+    audio.play().catch((err) => {
+      console.error("Local guide audio play failed:", err);
+      isPlayingAudio.current = false;
+    });
+  }
+
+  // Start Web Audio API VAD
+  async function startVadMonitoring() {
+    try {
+      if (typeof window === "undefined") return;
+      stopVadMonitoring();
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      audioContextRef.current = audioCtx;
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyserRef.current = analyser;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      lastActiveTimeRef.current = Date.now();
+      hasSpokenRef.current = false;
+
+      const checkVolume = () => {
+        if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted) {
+          vadRafIdRef.current = requestAnimationFrame(checkVolume);
+          return;
+        }
+
+        analyserRef.current.getByteTimeDomainData(dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / bufferLength);
+
+        // Volume threshold for active speaking
+        const VOICE_THRESHOLD = 0.015; 
+        const now = Date.now();
+
+        if (rms > VOICE_THRESHOLD) {
+          lastActiveTimeRef.current = now;
+          if (!hasSpokenRef.current) {
+            hasSpokenRef.current = true;
+            console.log("[VAD] Voice activity detected");
+          }
+        } else {
+          // If the user has spoken, and then is silent for 1.5 seconds, auto-submit
+          if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 1500)) {
+            const currentSpeechText = userLiveTranscriptRef.current.trim();
+            if (currentSpeechText) {
+              console.log("[VAD] 1.5s silence detected, auto-submitting:", currentSpeechText);
+              hasSpokenRef.current = false;
+              lastActiveTimeRef.current = now;
+              void handleUserVoiceQuery(currentSpeechText);
+            }
+          }
+        }
+
+        vadRafIdRef.current = requestAnimationFrame(checkVolume);
+      };
+
+      vadRafIdRef.current = requestAnimationFrame(checkVolume);
+    } catch (err) {
+      console.warn("VAD monitoring failed to initialize:", err);
+    }
+  }
+
+  function stopVadMonitoring() {
+    if (vadRafIdRef.current) {
+      cancelAnimationFrame(vadRafIdRef.current);
+      vadRafIdRef.current = null;
+    }
+    if (audioContextRef.current) {
+      if (audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+      }
+      audioContextRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+    analyserRef.current = null;
   }
 
   // Monitor 20-second inactivity timer
@@ -191,6 +339,9 @@ export function VoiceCounselorApp() {
       return;
     }
 
+    // Start VAD monitoring alongside SpeechRecognition
+    startVadMonitoring();
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -217,6 +368,10 @@ export function VoiceCounselorApp() {
       const currentLiveText = (finalTranscript + interimTranscript).trim();
       if (currentLiveText) {
         setUserLiveTranscript(currentLiveText);
+
+        // Update VAD activity states
+        lastActiveTimeRef.current = Date.now();
+        hasSpokenRef.current = true;
 
         // Reset silence detection timer (VAD threshold)
         if (silenceTimeoutRef.current) {
@@ -260,6 +415,9 @@ export function VoiceCounselorApp() {
       silenceTimeoutRef.current = null;
     }
 
+    // Reset VAD state to prevent double execution
+    hasSpokenRef.current = false;
+
     // Stop recording and clear live transcript display
     isPlayingAudio.current = true;
     if (recognitionRef.current) {
@@ -279,10 +437,8 @@ export function VoiceCounselorApp() {
     setError(null);
 
     try {
-      const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
-
-      // Play searching notification voice in background (fire-and-forget, do not block RAG completion)
-      void playTts(searchSpeakText);
+      // Play local static guide audio immediately to minimize latency (fire-and-forget)
+      playLocalGuideAudio();
       
       const payload = await requestPolicyAnswer(correctedQuestion);
       setIsSearching(false);
@@ -355,6 +511,9 @@ export function VoiceCounselorApp() {
   }
 
   function stopRealtime() {
+    // Stop VAD monitoring
+    stopVadMonitoring();
+
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current = null;
@@ -395,6 +554,14 @@ export function VoiceCounselorApp() {
 
   function setMicMuted(muted: boolean) {
     setIsMicMuted(muted);
+    if (muted) {
+      stopVadMonitoring();
+    } else {
+      if (isConnected && !isPlayingAudio.current) {
+        startVadMonitoring();
+      }
+    }
+
     if (recognitionRef.current) {
       try {
         if (muted) {

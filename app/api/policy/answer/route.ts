@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import crypto from "crypto";
-import { buildPolicyAnswer, classifyIntent, type PolicyIntent } from "@/lib/policyKnowledge";
+import { buildPolicyAnswer, classifyIntent, type PolicyIntent, samplePolicyChunks, type PolicyChunk } from "@/lib/policyKnowledge";
 import { correctInsuranceTerms } from "@/lib/koreanFuzzy";
 
 export const runtime = "nodejs";
@@ -42,6 +42,39 @@ async function scrapeUrl(url: string, apiKey?: string): Promise<string> {
     console.warn(`[Jina Reader] Error scraping ${url}:`, err);
     return "";
   }
+}
+
+// Local knowledge base keywords similarity match helper for Hybrid RAG
+function searchLocalChunks(question: string): PolicyChunk[] {
+  const cleanQ = question.toLowerCase();
+  const matched: Array<{ chunk: PolicyChunk; score: number }> = [];
+  
+  for (const chunk of samplePolicyChunks) {
+    let score = 0;
+    
+    // 1. Direct keyword match (Highest priority)
+    for (const kw of chunk.keywords) {
+      if (cleanQ.includes(kw.toLowerCase())) {
+        score += 5; // Add weight on keyword match
+      }
+    }
+    
+    // 2. Chunk content word match (Semantic overlap helper)
+    const contentWords = (chunk.content || "").split(/\s+/);
+    for (const word of contentWords) {
+      if (word.length > 1 && cleanQ.includes(word.toLowerCase())) {
+        score += 1; // Add minor weight on body word match
+      }
+    }
+    
+    if (score > 0) {
+      matched.push({ chunk, score });
+    }
+  }
+  
+  // Sort descending by relevance score
+  matched.sort((a, b) => b.score - a.score);
+  return matched.map(m => m.chunk).slice(0, 2); // Return top 2 matching local chunks
 }
 
 // Preprocess conversational user question into optimized Korean search keywords
@@ -346,6 +379,17 @@ ${content}`);
       searchErrors.push(`Serper: ${errMsg}`);
     }
 
+    // Hybrid RAG Search Integration: Search local knowledge base first
+    const localChunks = searchLocalChunks(question);
+    let localContext = "";
+    if (localChunks.length > 0) {
+      localContext = `[로컬 데이터베이스 약관 원문]\n` + localChunks.map((c, i) => {
+        return `조회된 약관자료 ${i + 1}: ${c.product} - ${c.documentTitle} (조항: ${c.section}, 페이지: ${c.page}p, 약관버전: ${c.version})
+본문내용: ${c.content}`;
+      }).join("\n\n");
+      console.log(`[Hybrid RAG] 로컬 매칭 청크 ${localChunks.length}개 발견`);
+    }
+
     let searchContext = "";
     if (searchSuccess && finalResults.length > 0) {
       const organicContext = finalResults.map((r: any, i: number) => {
@@ -355,14 +399,27 @@ ${content}`);
 내용: ${r.content}`;
       }).join("\n\n");
 
-      searchContext = extraContext 
+      const webContext = extraContext 
         ? `${extraContext}---\n\n${organicContext}`
         : organicContext;
+
+      searchContext = localContext
+        ? `${localContext}\n\n---\n\n[실시간 웹/공시 검색자료]\n${webContext}`
+        : webContext;
+
+      if (localChunks.length > 0) {
+        usedEngine = "로컬 약관 + Google (Serper)";
+      }
     } else {
-      usedEngine = searchErrors.length > 0
-        ? `자체 사전지식 (${searchErrors.join(", ")})`
-        : "자체 사전지식";
-      searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했거나 검색 엔진에 에러가 발생하여 자체 지식 분석 결과를 제공합니다.";
+      if (localChunks.length > 0) {
+        usedEngine = "로컬 약관 지식베이스";
+        searchContext = localContext;
+      } else {
+        usedEngine = searchErrors.length > 0
+          ? `자체 사전지식 (${searchErrors.join(", ")})`
+          : "자체 사전지식";
+        searchContext = "DB손해보험 상품공시실 및 웹 검색에서 구체적인 약관 및 보장 정보를 찾지 못했거나 검색 엔진에 에러가 발생하여 자체 지식 분석 결과를 제공합니다.";
+      }
     }
 
     // 3. Query OpenAI gpt-4o-mini to get logical response containing background reasoning
