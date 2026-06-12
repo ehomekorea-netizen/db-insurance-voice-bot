@@ -5,7 +5,8 @@ const testCases = [
   { input: "자동차 부상 수치료 보상해줘", expected: "자동차 부상 도수치료 보상해줘" },
   { input: "실선보험 서류 알려줘", expected: "실손보험 서류 알려줘" },
   { input: "자부지 지급 조건은?", expected: "자부치 지급 조건은?" },
-  { input: "깁스치로비 청구하고 싶어", expected: "깁스치료비 청구하고 싶어" }
+  { input: "깁스치로비 청구하고 싶어", expected: "깁스치료비 청구하고 싶어" },
+  { input: "고절 진단비 청구 서류가 어떻게 돼?", expected: "골절 진단비 청구 서류가 어떻게 돼?" }
 ];
 
 console.log("=== Korean Jamo Fuzzy Corrector Test ===");
