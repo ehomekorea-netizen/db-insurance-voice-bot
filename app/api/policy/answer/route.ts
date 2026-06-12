@@ -120,10 +120,10 @@ export async function POST(request: Request) {
       }
     );
 
-    // 503 Unavailable (High Demand) 또는 기타 API 에러 발생 시, 검증된 gemini-1.5-flash로 자동 폴백 재시도
+    // 503 Unavailable (High Demand) 또는 기타 API 에러 발생 시, 검증된 gemini-1.5-flash-latest로 자동 폴백 재시도
     if (response.status === 503 || !response.ok) {
-      console.warn(`[Gemini API Warning] ${modelName} 호출 실패(HTTP ${response.status}). 안정화된 gemini-1.5-flash로 즉시 우회 재시도합니다.`);
-      modelName = "gemini-1.5-flash";
+      console.warn(`[Gemini API Warning] ${modelName} 호출 실패(HTTP ${response.status}). 안정화된 gemini-1.5-flash-latest로 즉시 우회 재시도합니다.`);
+      modelName = "gemini-1.5-flash-latest";
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
         {
