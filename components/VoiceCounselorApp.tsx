@@ -863,6 +863,8 @@ function MessageBubble({
   copiedId: string | null;
   onCopy: (ans: PolicyAnswer) => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (message.role === "assistant" && message.answer) {
     const ans = message.answer;
     const isCopied = copiedId === message.id;
@@ -886,22 +888,7 @@ function MessageBubble({
           </button>
         </div>
 
-        {ans.analysis && (
-          <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-analysis">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </span>
-              질문 이해 및 분석 근거
-            </h4>
-            <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.6", color: "#334155" }}>
-              {renderFormattedText(ans.analysis)}
-            </p>
-          </div>
-        )}
+
 
         {ans.summary && (
           <div className="answer-section">
@@ -960,6 +947,69 @@ function MessageBubble({
           </div>
         )}
 
+        {/* 4. 질문 이해 및 분석 근거 (접이식 아코디언) */}
+        {ans.analysis && (
+          <div className="answer-section">
+            <h4 className="section-title">
+              <span className="icon-badge badge-analysis">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </span>
+              질문 이해 및 분석 근거
+            </h4>
+            <div style={{ marginTop: "4px" }}>
+              {isExpanded ? (
+                <>
+                  <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.65", color: "#334155" }}>
+                    {renderFormattedText(ans.analysis)}
+                  </p>
+                  <button
+                    onClick={() => setIsExpanded(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#2563eb",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      padding: "8px 0 0 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "2px"
+                    }}
+                  >
+                    상세 근거 접기 🔼
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsExpanded(true)}
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    color: "#475569",
+                    fontSize: "12.5px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    width: "100%",
+                    justifyContent: "center",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  상세 분석 근거 보기 🔽
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {ans.requiredInfo && ans.requiredInfo.length > 0 && (
           <div className="answer-section">
             <h4 className="section-title">
@@ -982,7 +1032,7 @@ function MessageBubble({
         )}
 
         {ans.citations && ans.citations.length > 0 && (
-          <div className="answer-section">
+          <div className="answer-section" style={{ borderBottom: "none" }}>
             <h4 className="section-title">
               <span className="icon-badge badge-citation">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
@@ -1002,9 +1052,22 @@ function MessageBubble({
                     href={citation.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "#0066cc", textDecoration: "underline", fontWeight: "500", wordBreak: "break-all" }}
+                    style={{
+                      color: "#2563eb",
+                      textDecoration: "underline",
+                      fontWeight: "600",
+                      wordBreak: "break-all",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "3px"
+                    }}
                   >
                     {safeDecodeURIComponent(citation.title)}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
                   </a>
                 </li>
               ))}

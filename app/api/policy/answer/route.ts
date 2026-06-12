@@ -11,38 +11,7 @@ type PolicyAnswerRequest = {
   product_hint?: string;
 };
 
-// Local knowledge base keywords similarity match helper for Hybrid RAG
-function searchLocalChunks(question: string): PolicyChunk[] {
-  const cleanQ = question.toLowerCase();
-  const matched: Array<{ chunk: PolicyChunk; score: number }> = [];
-  
-  for (const chunk of samplePolicyChunks) {
-    let score = 0;
-    
-    // 1. Direct keyword match (Highest priority)
-    for (const kw of chunk.keywords) {
-      if (cleanQ.includes(kw.toLowerCase())) {
-        score += 5; // Add weight on keyword match
-      }
-    }
-    
-    // 2. Chunk content word match (Semantic overlap helper)
-    const contentWords = (chunk.content || "").split(/\s+/);
-    for (const word of contentWords) {
-      if (word.length > 1 && cleanQ.includes(word.toLowerCase())) {
-        score += 1; // Add minor weight on body word match
-      }
-    }
-    
-    if (score > 0) {
-      matched.push({ chunk, score });
-    }
-  }
-  
-  // Sort descending by relevance score
-  matched.sort((a, b) => b.score - a.score);
-  return matched.map(m => m.chunk).slice(0, 2); // Return top 2 matching local chunks
-}
+// Local database chunks lookup helper removed per client request to focus 100% on search grounding.
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest;
@@ -87,16 +56,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Hybrid RAG Search Integration: Search local knowledge base first
-    const localChunks = searchLocalChunks(question);
-    let localContext = "";
-    if (localChunks.length > 0) {
-      localContext = `[로컬 데이터베이스 약관 참고자료]\n` + localChunks.map((c, i) => {
-        return `조회된 약관자료 ${i + 1}: ${c.product} - ${c.documentTitle} (조항: ${c.section}, 페이지: ${c.page}p, 약관버전: ${c.version})
-본문내용: ${c.content}`;
-      }).join("\n\n");
-      console.log(`[Hybrid RAG] 로컬 매칭 청크 ${localChunks.length}개 발견`);
-    }
+    // Local knowledge base chunk integration removed per client request.
 
     // 2. Query Gemini API with built-in Google Search Grounding tool
     const requestBody = {
@@ -105,9 +65,7 @@ export async function POST(request: Request) {
           role: "user",
           parts: [
             {
-              text: localContext
-                ? `[로컬 약관 참고 정보]\n${localContext}\n\n[PA 질문]\n${question}`
-                : `[PA 질문]\n${question}`
+              text: `[PA 질문]\n${question}`
             }
           ]
         }
@@ -246,9 +204,9 @@ export async function POST(request: Request) {
       };
     });
 
-    const usedEngine = groundingChunks.length > 0
-      ? (localChunks.length > 0 ? `로컬 약관 + Google Search (${modelName})` : `Google Search (${modelName})`)
-      : (localChunks.length > 0 ? `로컬 약관 지식베이스` : `Gemini (${modelName})`);
+    const usedEngine = modelName === "gemini-2.5-flash"
+      ? "실시간 검색 답변(Gemini 2.5 flash)"
+      : "실시간 검색 답변(Gemini 1.5 flash)";
 
     return NextResponse.json({
       id: crypto.randomUUID(),

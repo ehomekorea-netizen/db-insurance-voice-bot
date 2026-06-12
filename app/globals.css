@@ -474,16 +474,25 @@ body {
 .answer-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  border-bottom: 1px dashed rgba(226, 232, 240, 0.9);
+  padding-bottom: 16px;
+  margin-bottom: 4px;
+}
+
+.answer-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 750;
+  font-size: 13.5px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #1e293b;
+  color: #0f172a;
 }
 
 .icon-badge {
@@ -494,6 +503,8 @@ body {
   height: 26px;
   border-radius: 50%;
   flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 .badge-analysis { background: rgba(37, 99, 235, 0.07); color: #2563eb; }
 .badge-summary { background: rgba(245, 158, 11, 0.07); color: #d97706; }
@@ -508,14 +519,15 @@ body {
 }
 
 .summary-text {
-  font-size: 12.5px;
-  color: #1e293b;
-  line-height: 1.6;
+  font-size: 14px;
+  color: #0f172a;
+  line-height: 1.65;
   background: linear-gradient(135deg, #fffef9, #fffbeb);
-  border: 1px solid rgba(245, 158, 11, 0.15);
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-weight: 550;
+  border: 1.5px solid rgba(245, 158, 11, 0.28);
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.04);
 }
 
 .analysis-text {
