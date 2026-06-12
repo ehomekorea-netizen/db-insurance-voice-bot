@@ -71,8 +71,11 @@ export async function POST(request: Request) {
 
   const geminiKey = process.env.GEMINI_API_KEY;
 
+  // 디버깅용 로그 추가: Vercel 콘솔 로그에서 실제 키 유입 상태를 식별하기 위함
+  console.log(`[GEMINI_API_KEY Debug] 로드 여부: ${!!geminiKey}, 길이: ${geminiKey ? geminiKey.length : 0}, 앞 5글자: "${geminiKey ? geminiKey.substring(0, 5) : "없음"}"`);
+
   // FALLBACK: If Gemini API Key is not configured, fallback to local sample data
-  if (!geminiKey || geminiKey === "your-gemini-api-key-here") {
+  if (!geminiKey || geminiKey === "your-gemini-api-key-here" || geminiKey.trim() === "") {
     console.warn("경고: GEMINI_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
     const fallbackAnswer = buildPolicyAnswer({
       question,
