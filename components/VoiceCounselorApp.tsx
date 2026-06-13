@@ -137,6 +137,7 @@ export function VoiceCounselorApp() {
     }
     isRecordingRef.current = false;
     audioChunksRef.current = [];
+    resetInactivityTimer();
   }
 
   function initMediaRecorder(stream: MediaStream): MediaRecorder | null {
@@ -202,6 +203,7 @@ export function VoiceCounselorApp() {
     // Show text transcript live as assistant speaking indicator
     setLiveTranscript(text);
     isPlayingAudio.current = true;
+    resetInactivityTimer();
 
     // Turn off user recording while AI speaks to prevent echo feedback loop
     abortRecording();
@@ -215,6 +217,7 @@ export function VoiceCounselorApp() {
         console.warn(`[VOICE] Static audio file ${audioUrl} not found or inaccessible.`);
         setLiveTranscript("");
         isPlayingAudio.current = false;
+        resetInactivityTimer();
         return;
       }
 
@@ -230,12 +233,14 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          resetInactivityTimer();
           resolve();
         };
         audio.onerror = (e) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          resetInactivityTimer();
           reject(e);
         };
         audio.playbackRate = 1.15;
@@ -243,6 +248,7 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          resetInactivityTimer();
           reject(err);
         });
       });
@@ -250,6 +256,7 @@ export function VoiceCounselorApp() {
       console.error("playStaticAudio error:", err);
       setLiveTranscript("");
       isPlayingAudio.current = false;
+      resetInactivityTimer();
     }
   }
 
@@ -321,6 +328,7 @@ export function VoiceCounselorApp() {
         hasSpokenRef.current = false;
         isRecordingRef.current = false;
         lastActiveTimeRef.current = now;
+        resetInactivityTimer();
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
           try {
             mediaRecorderRef.current.stop();
@@ -354,6 +362,7 @@ export function VoiceCounselorApp() {
                 recordingStartTimeRef.current = now;
                 console.log("[VOICE] MediaRecorder started");
                 setUserLiveTranscript("말씀을 듣고 있습니다...");
+                resetInactivityTimer();
               } else {
                 console.error("[VOICE] MediaRecorder could not be initialized");
               }
@@ -369,6 +378,7 @@ export function VoiceCounselorApp() {
           isRecordingRef.current = false;
           lastActiveTimeRef.current = now;
           console.log("[VOICE] VAD silence detected (3.0s). Stopping recorder.");
+          resetInactivityTimer();
           
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             try {
@@ -402,7 +412,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending && !isRequestActiveRef.current) {
+    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending && !isRequestActiveRef.current && !isRecordingRef.current && !isTranscribingRef.current) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
@@ -471,6 +481,7 @@ export function VoiceCounselorApp() {
   async function handleAudioTranscription(blob: Blob) {
     console.log("[VOICE] handleAudioTranscription start");
     isTranscribingRef.current = true;
+    resetInactivityTimer();
     setUserLiveTranscript("음성을 분석하는 중입니다...");
 
     try {
@@ -496,17 +507,20 @@ export function VoiceCounselorApp() {
         console.log("[VOICE] [Whisper STT Filter] Empty transcription, ignore.");
         setUserLiveTranscript("");
         isTranscribingRef.current = false;
+        resetInactivityTimer();
         return;
       }
 
       setUserLiveTranscript(transcribedText);
       isTranscribingRef.current = false;
+      resetInactivityTimer();
       await handleUserVoiceQuery(transcribedText);
 
     } catch (err: any) {
       console.error("[VOICE] Transcription error:", err);
       setUserLiveTranscript("");
       isTranscribingRef.current = false;
+      resetInactivityTimer();
       setError(err instanceof Error ? err.message : "음성을 텍스트로 변환하는 중 오류가 발생했습니다.");
     }
   }
@@ -660,6 +674,7 @@ export function VoiceCounselorApp() {
       setIsConnected(true);
       setIsConnecting(false);
       isPlayingAudio.current = true;
+      resetInactivityTimer();
 
       // 5. Play welcome greeting
       addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
@@ -672,6 +687,7 @@ export function VoiceCounselorApp() {
       }
 
       isPlayingAudio.current = false;
+      resetInactivityTimer();
       if (!isMicMuted) {
         startSpeechRecognition(); // Kicks off startVadMonitoring loop!
       }
