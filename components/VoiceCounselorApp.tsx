@@ -1352,6 +1352,23 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 )}
               </button>
             )}
+            {!isLoggedIn && error && (
+              <div className="cover-error-message" style={{
+                color: "#f87171",
+                fontSize: "12.5px",
+                fontWeight: "700",
+                marginTop: "12px",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid rgba(239, 68, 68, 0.2)",
+                maxWidth: "280px",
+                lineHeight: "1.4",
+                textAlign: "center"
+              }}>
+                {error}
+              </div>
+            )}
           </div>
         </main>
       )}
