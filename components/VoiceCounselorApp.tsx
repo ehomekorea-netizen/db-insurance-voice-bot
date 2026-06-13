@@ -459,7 +459,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
-        setError("20초 동안 대화가 없어 음성 상담이 자동으로 종료되었습니다.");
+        addMessage({ role: "assistant", content: "응답이 없어 종료합니다." });
       }, 20 * 1000);
     }
   }
@@ -1321,6 +1321,14 @@ function MessageBubble({
   onCopy: (ans: PolicyAnswer) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  if (message.role === "assistant" && !message.answer) {
+    return (
+      <div className="message assistant-bubble">
+        {message.content}
+      </div>
+    );
+  }
 
   if (message.role === "assistant" && message.answer) {
     const ans = message.answer;
