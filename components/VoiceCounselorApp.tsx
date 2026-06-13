@@ -139,8 +139,8 @@ export function VoiceCounselorApp() {
 
   const searchingMessage = "네 PA님 금방 안내드리겠습니다";
 
-  // Audio Playback with TTS
-  async function playTts(text: string): Promise<void> {
+  // Play a static pre-generated audio file from public/audio folder (100% cost-free)
+  async function playStaticAudio(filename: string, text: string): Promise<void> {
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current = null;
@@ -153,48 +153,23 @@ export function VoiceCounselorApp() {
     // Turn off user recording while AI speaks to prevent echo feedback loop
     abortRecording();
 
-    // Map specific static phrases to pre-generated files to save costs
-    const staticFiles: Record<string, string> = {
-      "PA님 무엇을 도와드릴까요?": "/audio/welcome.mp3"
-    };
-
-    const audioUrl = staticFiles[text.trim()];
+    const audioUrl = `/audio/${filename}`;
 
     try {
-      let url = "";
-      let isStatic = false;
-
-      if (audioUrl) {
-        // Verify if the static file actually exists on the server. If not, fallback to live TTS API.
-        const checkRes = await fetch(audioUrl, { method: "HEAD" }).catch(() => null);
-        if (checkRes && checkRes.ok) {
-          url = audioUrl;
-          isStatic = true;
-          console.log(`[VOICE] Playing pre-generated static audio for: "${text}"`);
-        } else {
-          console.warn(`[VOICE] Static audio file ${audioUrl} not found or inaccessible. Falling back to live TTS API.`);
-        }
-      }
-
-      if (!isStatic) {
-        console.log(`[VOICE] Generating live TTS for: "${text}"`);
-        const response = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text })
-        });
-        if (!response.ok) {
-          throw new Error("TTS generation failed");
-        }
-        const blob = await response.blob();
-        url = URL.createObjectURL(blob);
+      // Verify if the static file actually exists on the server to prevent hang
+      const checkRes = await fetch(audioUrl, { method: "HEAD" }).catch(() => null);
+      if (!checkRes || !checkRes.ok) {
+        console.warn(`[VOICE] Static audio file ${audioUrl} not found or inaccessible.`);
+        setLiveTranscript("");
+        isPlayingAudio.current = false;
+        return;
       }
 
       if (!reusableAudioRef.current) {
         reusableAudioRef.current = new Audio();
       }
       const audio = reusableAudioRef.current;
-      audio.src = url;
+      audio.src = audioUrl;
       activeAudioRef.current = audio;
 
       await new Promise<void>((resolve, reject) => {
@@ -202,18 +177,12 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          if (!isStatic) {
-            URL.revokeObjectURL(url);
-          }
           resolve();
         };
         audio.onerror = (e) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          if (!isStatic) {
-            URL.revokeObjectURL(url);
-          }
           reject(e);
         };
         audio.playbackRate = 1.15;
@@ -221,61 +190,14 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          if (!isStatic) {
-            URL.revokeObjectURL(url);
-          }
           reject(err);
         });
       });
     } catch (err) {
-      console.error("playTts error:", err);
+      console.error("playStaticAudio error:", err);
       setLiveTranscript("");
       isPlayingAudio.current = false;
     }
-  }
-
-  // Local static guide audio immediate play
-  function playLocalGuideAudio() {
-    if (activeAudioRef.current) {
-      activeAudioRef.current.pause();
-      activeAudioRef.current = null;
-    }
-    
-    const randomIdx = Math.floor(Math.random() * 3) + 1; // 1, 2, 3
-    const guideFile = `/audio/guide_${randomIdx}.mp3`;
-    
-    isPlayingAudio.current = true;
-    abortRecording();
-
-    if (!reusableAudioRef.current) {
-      reusableAudioRef.current = new Audio();
-    }
-    const audio = reusableAudioRef.current;
-    audio.src = guideFile;
-    activeAudioRef.current = audio;
-    
-    const guideTexts: Record<number, string> = {
-      1: "네, PA님! 금방 약관을 조회해 드릴게요.",
-      2: "약관 내용을 분석하고 있습니다. 잠시만 기다려 주세요.",
-      3: "해당 보장 조항을 검색 중입니다. 잠시만요."
-    };
-    setLiveTranscript(guideTexts[randomIdx] || "조회 중입니다. 잠시만 기다려 주세요.");
-
-    audio.onended = () => {
-      activeAudioRef.current = null;
-      setLiveTranscript("");
-      isPlayingAudio.current = false;
-    };
-    audio.onerror = () => {
-      activeAudioRef.current = null;
-      setLiveTranscript("");
-      isPlayingAudio.current = false;
-    };
-    
-    audio.play().catch((err) => {
-      console.error("Local guide audio play failed:", err);
-      isPlayingAudio.current = false;
-    });
   }
 
   // Start VAD volume monitoring using the pre-initialized analyser
@@ -340,9 +262,9 @@ export function VoiceCounselorApp() {
         console.log("[VOICE] [VAD RMS]", rms.toFixed(4), "Threshold:", VOICE_THRESHOLD.toFixed(4), "Noise Floor:", noiseFloorRef.current.toFixed(4));
       }
 
-      // Safety check: force stop after 10 seconds of continuous recording to prevent freezing
-      if (isRecordingRef.current && (now - recordingStartTimeRef.current > 10000)) {
-        console.log("[VOICE] Continuous recording reached 10s safety limit. Force stopping.");
+      // Safety check: force stop after 20 seconds of continuous recording to prevent freezing
+      if (isRecordingRef.current && (now - recordingStartTimeRef.current > 20000)) {
+        console.log("[VOICE] Continuous recording reached 20s safety limit. Force stopping.");
         hasSpokenRef.current = false;
         isRecordingRef.current = false;
         lastActiveTimeRef.current = now;
@@ -388,12 +310,12 @@ export function VoiceCounselorApp() {
           }
         }
       } else {
-        // If the user has spoken, and then is silent for 1.5 seconds, stop recording and send to Whisper
-        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 1500)) {
+        // If the user has spoken, and then is silent for 2.5 seconds, stop recording and send to Whisper
+        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 2500)) {
           hasSpokenRef.current = false;
           isRecordingRef.current = false;
           lastActiveTimeRef.current = now;
-          console.log("[VOICE] VAD silence detected (1.5s). Stopping recorder.");
+          console.log("[VOICE] VAD silence detected (2.5s). Stopping recorder.");
           
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             try {
@@ -580,7 +502,7 @@ export function VoiceCounselorApp() {
 
     try {
       // Play local static guide audio immediately to minimize latency (fire-and-forget)
-      playLocalGuideAudio();
+      void playStaticAudio("searching.mp3", "잠시만 기다려주시면 곧 안내드리겠습니다.");
       
       console.log("[VOICE] requestPolicyAnswer:", correctedQuestion);
       const payload = await requestPolicyAnswer(correctedQuestion);
@@ -588,23 +510,20 @@ export function VoiceCounselorApp() {
 
       if (payload.isSimpleChat) {
         // A. Simple Conversational Answer
-        await playTts(payload.summary);
+        await playStaticAudio("after_response.mp3", "화면내용을 참고해주시고, 도움이 필요하시면 또 말씀해주세요.");
         
         isPlayingAudio.current = false;
         stopRealtime(); // ALWAYS stop realtime after simple chat to prevent mic leakage
       } else {
         // B. RAG Policy Answer
         setIsFinalEndingPending(true);
-        await playTts(payload.summary + " 자세한 내용은 화면의 내용을 참고해주세요.");
+        await playStaticAudio("after_response.mp3", "화면내용을 참고해주시고, 도움이 필요하시면 또 말씀해주세요.");
         setIsFinalEndingPending(false);
         stopRealtime(); // ALWAYS stop realtime after RAG answer
       }
     } catch (err: any) {
       setIsSearching(false);
       setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
-      
-      // Play error fallback message
-      await playTts("죄송합니다. 약관 조회 중 일시적인 오류가 발생했습니다. 다시 말씀해 주시겠어요?");
       
       isPlayingAudio.current = false;
       stopRealtime(); // ALWAYS stop realtime on error to prevent mic leakage
@@ -671,7 +590,7 @@ export function VoiceCounselorApp() {
 
       // 5. Play welcome greeting
       addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
-      await playTts("PA님 무엇을 도와드릴까요?");
+      await playStaticAudio("welcome.mp3", "PA님 무엇을 도와드릴까요?");
 
       // Check if session was cancelled during greeting playback
       if (activeSessionIdRef.current !== currentSessionId) {
@@ -820,7 +739,7 @@ export function VoiceCounselorApp() {
       const searchSpeakText = "네 PA님 금방 안내드리겠습니다";
 
       // Play searching notification voice in background (fire-and-forget)
-      void playTts(searchSpeakText);
+      void playStaticAudio("searching.mp3", "잠시만 기다려주시면 곧 안내드리겠습니다.");
       
       await requestPolicyAnswer(question);
     } catch (cause) {

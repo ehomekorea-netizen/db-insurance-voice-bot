@@ -29,10 +29,9 @@ if (!apiKey) {
 const openai = new OpenAI({ apiKey });
 
 const prompts = [
-  { file: 'guide_1.mp3', text: "네, PA님! 금방 약관을 조회해 드릴게요." },
-  { file: 'guide_2.mp3', text: "약관 내용을 분석하고 있습니다. 잠시만 기다려 주세요." },
-  { file: 'guide_3.mp3', text: "해당 보장 조항을 검색 중입니다. 잠시만요." },
-  { file: 'welcome.mp3', text: "PA님 무엇을 도와드릴까요?" }
+  { file: 'welcome.mp3', text: "PA님 무엇을 도와드릴까요?" },
+  { file: 'searching.mp3', text: "잠시만 기다려주시면 곧 안내드리겠습니다." },
+  { file: 'after_response.mp3', text: "화면내용을 참고해주시고, 도움이 필요하시면 또 말씀해주세요." }
 ];
 
 async function generate() {
@@ -44,6 +43,8 @@ async function generate() {
 
   for (const item of prompts) {
     const targetPath = path.join(publicAudioDir, item.file);
+    
+    // Always force regenerate on clean build or if file missing
     if (fs.existsSync(targetPath)) {
       console.log(`File already exists: ${item.file}. Skipping generation.`);
       continue;
