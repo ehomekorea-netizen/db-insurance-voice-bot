@@ -448,7 +448,7 @@ export function VoiceCounselorApp() {
     }
   }
 
-  // Monitor 20-second inactivity timer
+  // Monitor 5-second inactivity timer
   function resetInactivityTimer() {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
@@ -457,10 +457,10 @@ export function VoiceCounselorApp() {
 
     if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending && !isRequestActiveRef.current && !isRecordingRef.current && !isTranscribingRef.current) {
       inactivityTimerRef.current = setTimeout(() => {
-        console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
+        console.log("5초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
-        addMessage({ role: "assistant", content: "응답이 없어 종료합니다." });
-      }, 20 * 1000);
+        addMessage({ role: "assistant", content: "응답이 없어 대화를 종료합니다." });
+      }, 5 * 1000);
     }
   }
 
