@@ -33,9 +33,18 @@ function parseStreamedText(rawText: string) {
   
   if (summaryStart !== -1) {
     const end = conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : cleanText.length);
-    summary = cleanText.substring(summaryStart + 4, end).trim();
+    const rawSummary = cleanText.substring(summaryStart + 4, end).trim();
+    summary = rawSummary
+      .split("\n")
+      .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+      .join("\n")
+      .trim();
   } else if (analysisStart === -1) {
-    summary = cleanText; // Fallback during initial stream
+    summary = cleanText
+      .split("\n")
+      .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+      .join("\n")
+      .trim(); // Fallback during initial stream
   }
   
   if (conditionsStart !== -1) {
