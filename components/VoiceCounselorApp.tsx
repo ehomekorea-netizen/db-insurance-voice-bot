@@ -267,7 +267,7 @@ export function VoiceCounselorApp() {
         id: "welcome",
         role: "system",
         content:
-          "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+          "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
       }
     ]);
   }, []);
@@ -296,7 +296,7 @@ export function VoiceCounselorApp() {
           id: "welcome",
           role: "system",
           content:
-            "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+            "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
         }
       ]);
     }
@@ -1416,23 +1416,24 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           <img src="/promy.png" alt="PROMY" className="avatar-img" onClick={handleLogoClick} style={{ cursor: "pointer" }} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <h2>동목포 오멘토</h2>
-              {kakaoUser && (
-                <div className="user-badge" title={`${kakaoUser.nickname}님 로그인됨`}>
+              {kakaoUser ? (
+                <div className="user-badge-main" style={{ display: "flex", alignItems: "center", gap: "6px" }} title={`${kakaoUser.nickname}님 로그인됨`}>
                   {kakaoUser.profileImage ? (
-                    <img src={kakaoUser.profileImage} alt="" />
+                    <img src={kakaoUser.profileImage} alt="" style={{ width: "18px", height: "18px", borderRadius: "50%", border: "1.5px solid var(--text-ink)", objectFit: "cover" }} />
                   ) : (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#191919" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#191919" }}>
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                     </svg>
                   )}
-                  <span>{kakaoUser.nickname}님</span>
+                  <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>{kakaoUser.nickname}님</h2>
                 </div>
+              ) : (
+                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>PA님</h2>
               )}
             </div>
             <div className="messenger-status-row">
               <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
-                {isConnected && isMicMuted ? "🎙️ 프로미 답변 중 (음소거)" : statusLabel}
+                {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
               </span>
               {isConnected && (
                 <span className="session-timer">
@@ -1505,7 +1506,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 </div>
               )}
               <div className="bubble-wrapper">
-                {message.role === "assistant" && !isCard && <span className="sender-name">프로미</span>}
+                {message.role === "assistant" && !isCard && <span className="sender-name">동목포 오멘토</span>}
                 {message.role === "user" && <span className="sender-name">{kakaoUser?.nickname || "나"}</span>}
                 <MessageBubble
                   message={message}
@@ -1566,7 +1567,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               <img src="/promy.png" alt="PROMY" className="avatar-img" />
             </div>
             <div className="bubble-wrapper">
-              <span className="sender-name">프로미</span>
+              <span className="sender-name">동목포 오멘토</span>
               <div className="message assistant-bubble loader-bubble">
                 <div className="loader-card-content">
                   <div className="loader-spinner">
@@ -1891,18 +1892,8 @@ function MessageBubble({
           <div className="welcome-banner-body">
             <p className="welcome-greet">반갑습니다 PA님! 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
             <p className="welcome-instruction">
-              우측 상단의 <strong className="highlight-text-green">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어 약관 조회 및 영업 보장 조건에 대해 편하게 코칭을 받으실 수 있습니다.
+              우측 상단의 <strong className="highlight-text-green">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어, 보상 규정 및 주요 면책 조건에 대해 편하게 코칭을 받으실 수 있습니다.
             </p>
-            <div className="welcome-features">
-              <div className="feature-item">
-                <span className="feature-dot"></span>
-                <span>보상 규정 및 주요 면책 조건에 대해 쉽게 설명해 드립니다.</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-dot"></span>
-                <span>PA님의 영업 성공을 위해 약관 해석 및 영업 화법을 코칭해 드립니다.</span>
-              </div>
-            </div>
           </div>
         </div>
       );
