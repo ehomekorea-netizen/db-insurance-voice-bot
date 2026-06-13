@@ -92,18 +92,19 @@ export function VoiceCounselorApp() {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
-  const userLiveTranscriptRef = useRef("");
-  useEffect(() => {
-    userLiveTranscriptRef.current = userLiveTranscript;
-  }, [userLiveTranscript]);
+  const userLiveTranscriptRef = useRef(userLiveTranscript);
+  userLiveTranscriptRef.current = userLiveTranscript;
 
   const isConnectedRef = useRef(isConnected);
-  const isSearchingRef = useRef(isSearching);
-  const isMicMutedRef = useRef(isMicMuted);
+  isConnectedRef.current = isConnected;
 
-  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
-  useEffect(() => { isSearchingRef.current = isSearching; }, [isSearching]);
-  useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
+  const isSearchingRef = useRef(isSearching);
+  isSearchingRef.current = isSearching;
+
+  const isMicMutedRef = useRef(isMicMuted);
+  isMicMutedRef.current = isMicMuted;
+
+
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -123,6 +124,8 @@ export function VoiceCounselorApp() {
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingAudio = useRef(false);
   const [isFinalEndingPending, setIsFinalEndingPending] = useState(false);
+  const isFinalEndingPendingRef = useRef(isFinalEndingPending);
+  isFinalEndingPendingRef.current = isFinalEndingPending;
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeAnswerAbortControllerRef = useRef<AbortController | null>(null);
@@ -455,7 +458,18 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending && !isRequestActiveRef.current && !isRecordingRef.current && !isTranscribingRef.current) {
+    console.log("[DEBUG] resetInactivityTimer states:", {
+      isConnected: isConnectedRef.current,
+      isMicMuted: isMicMutedRef.current,
+      isSearching: isSearchingRef.current,
+      isPlayingAudio: isPlayingAudio.current,
+      isFinalEndingPending: isFinalEndingPendingRef.current,
+      isRequestActive: isRequestActiveRef.current,
+      isRecording: isRecordingRef.current,
+      isTranscribing: isTranscribingRef.current
+    });
+
+    if (isConnectedRef.current && !isMicMutedRef.current && !isSearchingRef.current && !isPlayingAudio.current && !isFinalEndingPendingRef.current && !isRequestActiveRef.current && !isRecordingRef.current && !isTranscribingRef.current) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("5초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
