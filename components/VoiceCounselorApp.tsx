@@ -49,6 +49,7 @@ export function VoiceCounselorApp() {
   ]);
 
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const reusableAudioRef = useRef<HTMLAudioElement | null>(null); // Reusable unlocked audio node for Safari/iOS compatibility
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef<boolean>(false);
@@ -181,7 +182,11 @@ export function VoiceCounselorApp() {
         url = URL.createObjectURL(blob);
       }
 
-      const audio = new Audio(url);
+      if (!reusableAudioRef.current) {
+        reusableAudioRef.current = new Audio();
+      }
+      const audio = reusableAudioRef.current;
+      audio.src = url;
       activeAudioRef.current = audio;
 
       await new Promise<void>((resolve, reject) => {
@@ -233,7 +238,11 @@ export function VoiceCounselorApp() {
     isPlayingAudio.current = true;
     abortRecording();
 
-    const audio = new Audio(guideFile);
+    if (!reusableAudioRef.current) {
+      reusableAudioRef.current = new Audio();
+    }
+    const audio = reusableAudioRef.current;
+    audio.src = guideFile;
     activeAudioRef.current = audio;
     
     const guideTexts: Record<number, string> = {
@@ -597,6 +606,18 @@ export function VoiceCounselorApp() {
     console.log("[VOICE] startRealtime");
     setError(null);
     setIsConnecting(true);
+
+    // Initialize the reusable audio element under user click gesture to unlock autoplay for the entire session
+    if (typeof window !== "undefined") {
+      if (!reusableAudioRef.current) {
+        reusableAudioRef.current = new Audio();
+      }
+      // Play a short silent audio to unlock the browser autoplay restriction
+      reusableAudioRef.current.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA";
+      reusableAudioRef.current.play().catch((err) => {
+        console.warn("[VOICE] Autoplay unlock failed:", err);
+      });
+    }
 
     const currentSessionId = crypto.randomUUID();
     activeSessionIdRef.current = currentSessionId;
