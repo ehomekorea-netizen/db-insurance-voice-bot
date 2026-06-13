@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUser, upsertUser } from "@/lib/firebase";
 
 export async function POST(request: Request) {
   try {
@@ -65,9 +66,23 @@ export async function POST(request: Request) {
     // Extract profile details
     const nickname = userData.properties?.nickname || userData.kakao_account?.profile?.nickname || "사용자";
     const profileImage = userData.properties?.thumbnail_image || userData.kakao_account?.profile?.thumbnail_image_url || "";
-    const id = userData.id;
+    const id = String(userData.id);
 
-    console.log(`[KAKAO AUTH] Successfully authenticated user: ${nickname} (${id})`);
+    console.log(`[KAKAO AUTH] Authenticated Kakao ID: ${id}, Name: ${nickname}`);
+
+    // 3. Check database user status
+    const dbUser = await getUser(id);
+    if (dbUser && dbUser.status === "blocked") {
+      console.warn(`[KAKAO AUTH] Blocked user login attempt: ${nickname} (${id})`);
+      return NextResponse.json(
+        { error: "접근 권한이 허용되지 않은 사용자입니다. 지점 관리자에게 문의하세요." },
+        { status: 403 }
+      );
+    }
+
+    // 4. Register/Update user profile in DB
+    await upsertUser(id, nickname, profileImage);
+    console.log(`[KAKAO AUTH] Upserted DB user profile: ${nickname}`);
 
     return NextResponse.json({
       success: true,
@@ -82,3 +97,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }
+
