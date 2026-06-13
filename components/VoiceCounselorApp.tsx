@@ -152,17 +152,35 @@ export function VoiceCounselorApp() {
     // Turn off user recording while AI speaks to prevent echo feedback loop
     abortRecording();
 
+    // Map specific static phrases to pre-generated files to save costs
+    const staticFiles: Record<string, string> = {
+      "PA님 무엇을 도와드릴까요?": "/audio/welcome.mp3"
+    };
+
+    const audioUrl = staticFiles[text.trim()];
+
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      });
-      if (!response.ok) {
-        throw new Error("TTS generation failed");
+      let url: string;
+      let isStatic = false;
+
+      if (audioUrl) {
+        url = audioUrl;
+        isStatic = true;
+        console.log(`[VOICE] Playing pre-generated static audio for: "${text}"`);
+      } else {
+        console.log(`[VOICE] Generating live TTS for: "${text}"`);
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        if (!response.ok) {
+          throw new Error("TTS generation failed");
+        }
+        const blob = await response.blob();
+        url = URL.createObjectURL(blob);
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+
       const audio = new Audio(url);
       activeAudioRef.current = audio;
 
@@ -171,21 +189,27 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          URL.revokeObjectURL(url);
+          if (!isStatic) {
+            URL.revokeObjectURL(url);
+          }
           resolve();
         };
         audio.onerror = (e) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          URL.revokeObjectURL(url);
+          if (!isStatic) {
+            URL.revokeObjectURL(url);
+          }
           reject(e);
         };
         audio.play().catch((err) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
-          URL.revokeObjectURL(url);
+          if (!isStatic) {
+            URL.revokeObjectURL(url);
+          }
           reject(err);
         });
       });
@@ -504,6 +528,29 @@ export function VoiceCounselorApp() {
     abortRecording();
     setUserLiveTranscript("");
 
+    // Turn off the microphone stream and close the AudioContext immediately to prevent background listening/token waste
+    if (micStreamRef.current) {
+      console.log("[VOICE] Releasing mic stream during Gemini query processing");
+      micStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.error("[VOICE] Error stopping track:", e);
+        }
+      });
+      micStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      console.log("[VOICE] Closing AudioContext during Gemini query processing");
+      const ctx = audioContextRef.current;
+      if (ctx.state !== "closed") {
+        ctx.close().catch((err) => console.error("[VOICE] Error closing AudioContext:", err));
+      }
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    stopVadMonitoring();
+
     const correctedQuestion = correctSttErrors(question);
 
     // Optimistically add user bubble
@@ -526,16 +573,13 @@ export function VoiceCounselorApp() {
         await playTts(payload.summary);
         
         isPlayingAudio.current = false;
-        if (isConnected && !isMicMuted) {
-          startSpeechRecognition();
-          resetInactivityTimer();
-        }
+        stopRealtime(); // ALWAYS stop realtime after simple chat to prevent mic leakage
       } else {
         // B. RAG Policy Answer
         setIsFinalEndingPending(true);
-        await playTts("답변과 함께 상담은 자동종료됩니다.");
+        await playTts(payload.summary + " 자세한 내용은 화면의 내용을 참고해주세요.");
         setIsFinalEndingPending(false);
-        stopRealtime();
+        stopRealtime(); // ALWAYS stop realtime after RAG answer
       }
     } catch (err: any) {
       setIsSearching(false);
@@ -545,10 +589,7 @@ export function VoiceCounselorApp() {
       await playTts("죄송합니다. 약관 조회 중 일시적인 오류가 발생했습니다. 다시 말씀해 주시겠어요?");
       
       isPlayingAudio.current = false;
-      if (isConnected && !isMicMuted) {
-        startSpeechRecognition();
-        resetInactivityTimer();
-      }
+      stopRealtime(); // ALWAYS stop realtime on error to prevent mic leakage
     }
   }
 

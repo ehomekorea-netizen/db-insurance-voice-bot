@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/generate-guide-audio.js && next build",
     "start": "next start",
-    "check": "next build"
+    "check": "node scripts/generate-guide-audio.js && next build"
   },
   "dependencies": {
     "next": "^16.2.9",
