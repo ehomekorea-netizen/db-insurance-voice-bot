@@ -332,8 +332,8 @@ export function VoiceCounselorApp() {
         noiseFloorRef.current = noiseFloorRef.current * 0.95 + rms * 0.05;
       }
 
-      // Dynamic voice threshold: noise floor + 0.006 (minimum 0.008 to ignore small background changes)
-      const VOICE_THRESHOLD = Math.max(0.008, noiseFloorRef.current + 0.006);
+      // Dynamic voice threshold: noise floor + 0.015 (minimum 0.020 to ignore small background changes like breathing/clicks)
+      const VOICE_THRESHOLD = Math.max(0.020, noiseFloorRef.current + 0.015);
 
       frameCount++;
       if (frameCount % 30 === 0) {
