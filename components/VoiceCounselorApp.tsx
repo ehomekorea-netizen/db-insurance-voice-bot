@@ -1487,7 +1487,7 @@ function MessageBubble({
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
           <div className="card-top-left">
-            <span className="card-category-tag">모델: {ans.modelName || "Gemini 3.1 Flash-Lite"}</span>
+            <span className="card-category-tag">약관 분석</span>
           </div>
           <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
@@ -1533,42 +1533,25 @@ function MessageBubble({
               className="section-title accordion-header"
               onClick={() => setIsExpanded(!isExpanded)}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                width: "100%",
-                padding: "8px 12px",
-                borderRadius: "8px",
                 backgroundColor: isExpanded ? "rgba(37, 99, 235, 0.03)" : "transparent",
                 transition: "background-color 0.2s"
               }}
               title="클릭하여 분석 근거 상세 보기"
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span className="icon-badge badge-analysis">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
+              <div className="accordion-header-content">
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="icon-badge badge-analysis">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </span>
+                  <span style={{ fontWeight: "800" }}>질문 이해 및 분석근거</span>
+                </div>
+                <span className="accordion-toggle-tag">
+                  {isExpanded ? "내용접기▲" : "내용열기▼"}
                 </span>
-                <span style={{ fontWeight: "800" }}>질문 이해 및 분석근거</span>
               </div>
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "#2563eb",
-                  fontWeight: "750",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "2px",
-                  backgroundColor: "rgba(37, 99, 235, 0.08)",
-                  padding: "4px 8px",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(37, 99, 235, 0.2)"
-                }}
-              >
-                {isExpanded ? "내용접기▲" : "내용열기▼"}
-              </span>
             </h4>
             {isExpanded && (
               <div style={{ marginTop: "4px" }}>
@@ -1703,8 +1686,9 @@ function MessageBubble({
           </footer>
         )}
 
-        <div className="card-timestamp" style={{ textAlign: "right", fontSize: "11px", color: "#94a3b8", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
-          조회 시간: {message.timestamp || new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}
+        <div className="card-timestamp" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#94a3b8", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
+          <span>엔진: {ans.modelName || "Gemini 3.1 Flash-Lite"}</span>
+          <span>조회 시간: {message.timestamp || new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
         </div>
       </article>
     );

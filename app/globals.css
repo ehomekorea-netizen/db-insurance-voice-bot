@@ -1112,13 +1112,42 @@ body {
   cursor: pointer !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none;
+  margin: 0 -12px !important;
+  width: calc(100% + 24px) !important;
+  border-radius: 0 !important;
+  display: block !important;
 }
 .accordion-header:hover {
   background-color: rgba(37, 99, 235, 0.08) !important;
-  transform: translateY(-0.5px);
 }
-.accordion-header:active {
-  transform: translateY(0);
+.accordion-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+}
+.accordion-toggle-tag {
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: rgba(37, 99, 235, 0.08);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+@media (max-width: 768px) {
+  .accordion-header {
+    margin: 0 -8px !important;
+    width: calc(100% + 16px) !important;
+  }
+  .accordion-header-content {
+    padding: 8px 8px;
+  }
 }
 
 /* 참고 출처 뉴스 헤드라인 카드 링크 스타일 */
