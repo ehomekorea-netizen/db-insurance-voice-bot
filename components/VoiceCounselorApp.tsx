@@ -31,6 +31,14 @@ export function VoiceCounselorApp() {
     userLiveTranscriptRef.current = userLiveTranscript;
   }, [userLiveTranscript]);
 
+  const isConnectedRef = useRef(isConnected);
+  const isSearchingRef = useRef(isSearching);
+  const isMicMutedRef = useRef(isMicMuted);
+
+  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
+  useEffect(() => { isSearchingRef.current = isSearching; }, [isSearching]);
+  useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -73,6 +81,51 @@ export function VoiceCounselorApp() {
     }
     isRecordingRef.current = false;
     audioChunksRef.current = [];
+  }
+
+  function initMediaRecorder(stream: MediaStream): MediaRecorder | null {
+    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return null;
+
+    let mimeType = "audio/webm";
+    if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+      mimeType = "audio/webm;codecs=opus";
+    } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+      mimeType = "audio/ogg;codecs=opus";
+    } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+      mimeType = "audio/mp4";
+    } else if (MediaRecorder.isTypeSupported("audio/wav")) {
+      mimeType = "audio/wav";
+    }
+    console.log("[VOICE] Selected MediaRecorder MIME type:", mimeType);
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch (e) {
+      console.warn("[VOICE] MediaRecorder with mimeType failed, falling back to default.", e);
+      recorder = new MediaRecorder(stream);
+    }
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        audioChunksRef.current.push(e.data);
+      }
+    };
+    recorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      audioChunksRef.current = [];
+      
+      console.log("[VOICE] MediaRecorder stopped. Blob size:", audioBlob.size, "MIME type:", audioBlob.type);
+      if (audioBlob.size < 100) {
+        setUserLiveTranscript("");
+        isTranscribingRef.current = false;
+        return;
+      }
+
+      await handleAudioTranscription(audioBlob);
+    };
+
+    return recorder;
   }
 
   const statusLabel = useMemo(() => {
@@ -205,7 +258,15 @@ export function VoiceCounselorApp() {
     let frameCount = 0;
 
     const checkVolume = () => {
-      if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted || isTranscribingRef.current) {
+      // Terminate the animation loop completely if disconnected or analyser is released
+      if (!analyserRef.current || !isConnectedRef.current) {
+        console.log("[VOICE] VAD checkVolume loop stopped (disconnected)");
+        vadRafIdRef.current = null;
+        return;
+      }
+
+      // Temporarily skip volume checks while busy, but keep the loop alive by rescheduling
+      if (isSearchingRef.current || isPlayingAudio.current || isMicMutedRef.current || isTranscribingRef.current) {
         vadRafIdRef.current = requestAnimationFrame(checkVolume);
         return;
       }
@@ -234,14 +295,22 @@ export function VoiceCounselorApp() {
           hasSpokenRef.current = true;
           console.log("[VOICE] speech detected. RMS:", rms);
           
-          // Start MediaRecorder if not already recording
-          if (mediaRecorderRef.current && !isRecordingRef.current) {
+          // Start MediaRecorder if not already recording (deliver chunks every 250ms)
+          if (!isRecordingRef.current) {
             try {
               audioChunksRef.current = [];
-              mediaRecorderRef.current.start();
-              isRecordingRef.current = true;
-              console.log("[VOICE] MediaRecorder started");
-              setUserLiveTranscript("말씀을 듣고 있습니다...");
+              if (!mediaRecorderRef.current && micStreamRef.current) {
+                console.log("[VOICE] Re-initializing MediaRecorder on-demand in VAD");
+                mediaRecorderRef.current = initMediaRecorder(micStreamRef.current);
+              }
+              if (mediaRecorderRef.current) {
+                mediaRecorderRef.current.start(250);
+                isRecordingRef.current = true;
+                console.log("[VOICE] MediaRecorder started");
+                setUserLiveTranscript("말씀을 듣고 있습니다...");
+              } else {
+                console.error("[VOICE] MediaRecorder could not be initialized");
+              }
             } catch (e) {
               console.error("[VOICE] Failed to start MediaRecorder:", e);
             }
@@ -493,51 +562,8 @@ export function VoiceCounselorApp() {
       const source = audioCtx.createMediaStreamSource(stream);
       source.connect(analyser);
 
-      // 3. Select supported MIME type for Safari / Mobile compatibility
-      let mimeType = "audio/webm";
-      if (typeof MediaRecorder !== "undefined") {
-        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-          mimeType = "audio/webm;codecs=opus";
-        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
-          mimeType = "audio/ogg;codecs=opus";
-        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-          mimeType = "audio/mp4";
-        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
-          mimeType = "audio/wav";
-        }
-      }
-      console.log("[VOICE] Selected MediaRecorder MIME type:", mimeType);
-
-      // 4. Initialize MediaRecorder bound to this stream
-      let recorder: MediaRecorder;
-      try {
-        recorder = new MediaRecorder(stream, { mimeType });
-      } catch (e) {
-        console.warn("[VOICE] MediaRecorder with mimeType failed, falling back to default.", e);
-        recorder = new MediaRecorder(stream);
-      }
-
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        audioChunksRef.current = [];
-        
-        console.log("[VOICE] MediaRecorder stopped. Blob size:", audioBlob.size, "MIME type:", audioBlob.type);
-        if (audioBlob.size < 100) {
-          setUserLiveTranscript("");
-          isTranscribingRef.current = false;
-          return;
-        }
-
-        await handleAudioTranscription(audioBlob);
-      };
-      mediaRecorderRef.current = recorder;
-      console.log("[VOICE] MediaRecorder initialized. MIME:", recorder.mimeType);
+      // 3. Initialize MediaRecorder bound to this stream
+      mediaRecorderRef.current = initMediaRecorder(stream);
 
       setIsConnected(true);
       setIsConnecting(false);
@@ -590,6 +616,32 @@ export function VoiceCounselorApp() {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
+
+    // Stop all microphone tracks to turn off the recording indicator
+    if (micStreamRef.current) {
+      console.log("[VOICE] Stopping mic stream tracks");
+      micStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.error("[VOICE] Error stopping track:", e);
+        }
+      });
+      micStreamRef.current = null;
+    }
+
+    // Close AudioContext to release hardware resources
+    if (audioContextRef.current) {
+      console.log("[VOICE] Closing AudioContext");
+      const ctx = audioContextRef.current;
+      if (ctx.state !== "closed") {
+        ctx.close().catch((err) => {
+          console.error("[VOICE] Error closing AudioContext:", err);
+        });
+      }
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
 
     setIsConnected(false);
     setIsConnecting(false);
