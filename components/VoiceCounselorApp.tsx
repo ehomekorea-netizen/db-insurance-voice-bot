@@ -1413,20 +1413,19 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Header */}
       <header className="messenger-header">
         <div className="messenger-brand">
-          <img src="/promy.png" alt="PROMY" className="avatar-img" onClick={handleLogoClick} style={{ cursor: "pointer" }} />
+          {kakaoUser && kakaoUser.profileImage ? (
+            <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
+          ) : (
+            <div className="avatar-img-fallback">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#ffffff" }}>
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+              </svg>
+            </div>
+          )}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {kakaoUser ? (
-                <div className="user-badge-main" style={{ display: "flex", alignItems: "center", gap: "6px" }} title={`${kakaoUser.nickname}님 로그인됨`}>
-                  {kakaoUser.profileImage ? (
-                    <img src={kakaoUser.profileImage} alt="" style={{ width: "18px", height: "18px", borderRadius: "50%", border: "1.5px solid var(--text-ink)", objectFit: "cover" }} />
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#191919" }}>
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-                    </svg>
-                  )}
-                  <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>{kakaoUser.nickname}님</h2>
-                </div>
+                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>{kakaoUser.nickname}님</h2>
               ) : (
                 <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>PA님</h2>
               )}
@@ -1886,8 +1885,7 @@ function MessageBubble({
       return (
         <div className="welcome-banner-card">
           <div className="welcome-banner-header">
-            <span className="welcome-banner-badge">GUIDE</span>
-            <h4>동목포 오멘토의 영업 & 보장분석 코칭</h4>
+            <span className="welcome-banner-badge">NOTICE</span>
           </div>
           <div className="welcome-banner-body">
             <p className="welcome-greet">반갑습니다 PA님! 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
