@@ -41,8 +41,10 @@ export function VoiceCounselorApp() {
   ]);
 
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const isRecordingRef = useRef<boolean>(false);
+  const isTranscribingRef = useRef<boolean>(false);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingAudio = useRef(false);
   const isFinalEndingPending = useRef(false);
@@ -56,6 +58,22 @@ export function VoiceCounselorApp() {
   const vadRafIdRef = useRef<number | null>(null);
   const lastActiveTimeRef = useRef<number>(Date.now());
   const hasSpokenRef = useRef<boolean>(false);
+
+  function abortRecording() {
+    if (mediaRecorderRef.current) {
+      const rec = mediaRecorderRef.current;
+      rec.onstop = null;
+      rec.ondataavailable = null;
+      try {
+        if (rec.state !== "inactive") {
+          rec.stop();
+        }
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
+    isRecordingRef.current = false;
+    audioChunksRef.current = [];
+  }
 
   const statusLabel = useMemo(() => {
     if (isConnecting) return "프로미 호출 중...";
@@ -76,12 +94,8 @@ export function VoiceCounselorApp() {
     setLiveTranscript(text);
     isPlayingAudio.current = true;
 
-    // Turn off user SpeechRecognition while AI speaks to prevent echo feedback loop
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
-    }
+    // Turn off user recording while AI speaks to prevent echo feedback loop
+    abortRecording();
 
     try {
       const response = await fetch("/api/tts", {
@@ -135,11 +149,7 @@ export function VoiceCounselorApp() {
     const guideFile = `/audio/guide_${randomIdx}.mp3`;
     
     isPlayingAudio.current = true;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
-    }
+    abortRecording();
 
     const audio = new Audio(guideFile);
     activeAudioRef.current = audio;
@@ -168,7 +178,7 @@ export function VoiceCounselorApp() {
     });
   }
 
-  // Start Web Audio API VAD
+  // Start Web Audio API VAD and initialize MediaRecorder
   async function startVadMonitoring() {
     try {
       if (typeof window === "undefined") return;
@@ -194,8 +204,30 @@ export function VoiceCounselorApp() {
       lastActiveTimeRef.current = Date.now();
       hasSpokenRef.current = false;
 
+      // Initialize MediaRecorder bound to this stream
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        
+        if (audioBlob.size < 1000) {
+          setUserLiveTranscript("");
+          isTranscribingRef.current = false;
+          return;
+        }
+
+        await handleAudioTranscription(audioBlob);
+      };
+      mediaRecorderRef.current = recorder;
+
       const checkVolume = () => {
-        if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted) {
+        if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted || isTranscribingRef.current) {
           vadRafIdRef.current = requestAnimationFrame(checkVolume);
           return;
         }
@@ -218,16 +250,33 @@ export function VoiceCounselorApp() {
           if (!hasSpokenRef.current) {
             hasSpokenRef.current = true;
             console.log("[VAD] Voice activity detected");
+            
+            // Start MediaRecorder if not already recording
+            if (mediaRecorderRef.current && !isRecordingRef.current) {
+              try {
+                audioChunksRef.current = [];
+                mediaRecorderRef.current.start();
+                isRecordingRef.current = true;
+                setUserLiveTranscript("말씀을 듣고 있습니다...");
+              } catch (e) {
+                console.error("Failed to start MediaRecorder:", e);
+              }
+            }
           }
         } else {
-          // If the user has spoken, and then is silent for 1.5 seconds, auto-submit
+          // If the user has spoken, and then is silent for 1.5 seconds, stop recording and send to Whisper
           if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 1500)) {
-            const currentSpeechText = userLiveTranscriptRef.current.trim();
-            if (currentSpeechText) {
-              console.log("[VAD] 1.5s silence detected, auto-submitting:", currentSpeechText);
-              hasSpokenRef.current = false;
-              lastActiveTimeRef.current = now;
-              void handleUserVoiceQuery(currentSpeechText);
+            hasSpokenRef.current = false;
+            isRecordingRef.current = false;
+            lastActiveTimeRef.current = now;
+            
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+              try {
+                mediaRecorderRef.current.stop();
+                setUserLiveTranscript("음성을 분석하는 중입니다...");
+              } catch (e) {
+                console.error("Failed to stop MediaRecorder:", e);
+              }
             }
           }
         }
@@ -327,105 +376,59 @@ export function VoiceCounselorApp() {
   }, [messages, liveTranscript, isSearching, userLiveTranscript]);
 
   function startSpeechRecognition() {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
-    }
-
-    if (typeof window === "undefined") return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn("SpeechRecognition not supported in this browser");
-      return;
-    }
-
-    // Start VAD monitoring alongside SpeechRecognition
+    abortRecording();
     startVadMonitoring();
+  }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "ko-KR";
+  async function handleAudioTranscription(blob: Blob) {
+    isTranscribingRef.current = true;
+    setUserLiveTranscript("음성을 분석하는 중입니다...");
 
-    recognition.onresult = (event: any) => {
-      // Clear 20-second inactivity timer while user is actively speaking
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-        inactivityTimerRef.current = null;
-      }
-
-      let interimTranscript = "";
-      let finalTranscript = "";
-
-      for (let i = 0; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-
-      const currentLiveText = (finalTranscript + interimTranscript).trim();
-      if (currentLiveText) {
-        setUserLiveTranscript(currentLiveText);
-
-        // Update VAD activity states
-        lastActiveTimeRef.current = Date.now();
-        hasSpokenRef.current = true;
-
-        // Reset silence detection timer (VAD threshold)
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-        }
-
-        silenceTimeoutRef.current = setTimeout(() => {
-          const finalQuestion = currentLiveText;
-          if (finalQuestion) {
-            void handleUserVoiceQuery(finalQuestion);
-          }
-        }, 1800);
-      }
-    };
-
-    recognition.onerror = (e: any) => {
-      console.warn("SpeechRecognition error:", e.error);
-    };
-
-    recognition.onend = () => {
-      console.log("SpeechRecognition ended");
-      // Auto restart if connected, not playing audio, and not searching
-      if (isConnected && !isPlayingAudio.current && !isSearching && !isMicMuted) {
-        try {
-          recognition.start();
-        } catch {}
-      }
-    };
-
-    recognitionRef.current = recognition;
     try {
-      recognition.start();
+      const formData = new FormData();
+      formData.append("file", blob, "audio.webm");
+
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("STT transcription failed");
+      }
+
+      const data = await response.json();
+      const transcribedText = (data.text || "").trim();
+      console.log("[Whisper STT] Result:", transcribedText);
+
+      // Filter out empty, short, or meaningless words
+      const ignoredWords = ["아", "어", "음", "네", "예", "저기", "씁", "에", "그", "아 예", "어 예"];
+      
+      if (!transcribedText || transcribedText.length < 3 || ignoredWords.includes(transcribedText)) {
+        console.log("[Whisper STT Filter] Ignored noise/short query:", transcribedText);
+        setUserLiveTranscript("");
+        isTranscribingRef.current = false;
+        return;
+      }
+
+      setUserLiveTranscript(transcribedText);
+      isTranscribingRef.current = false;
+      await handleUserVoiceQuery(transcribedText);
+
     } catch (err) {
-      console.error("Failed to start SpeechRecognition:", err);
+      console.error("Transcription error:", err);
+      setUserLiveTranscript("");
+      isTranscribingRef.current = false;
     }
   }
 
   async function handleUserVoiceQuery(question: string) {
-    if (silenceTimeoutRef.current) {
-      clearTimeout(silenceTimeoutRef.current);
-      silenceTimeoutRef.current = null;
-    }
-
     // Reset VAD state to prevent double execution
     hasSpokenRef.current = false;
 
     // Stop recording and clear live transcript display
     isPlayingAudio.current = true;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
-    }
+    abortRecording();
     setUserLiveTranscript("");
 
     const correctedQuestion = correctSttErrors(question);
@@ -539,29 +542,12 @@ export function VoiceCounselorApp() {
       activeAudioRef.current = null;
     }
 
-    if (recognitionRef.current) {
-      const rec = recognitionRef.current;
-      // Detach all event handlers to avoid race conditions and background restarts
-      rec.onresult = null;
-      rec.onerror = null;
-      rec.onend = null;
-      try {
-        rec.abort();
-      } catch {}
-      recognitionRef.current = null;
-    }
-
-    if (silenceTimeoutRef.current) {
-      clearTimeout(silenceTimeoutRef.current);
-      silenceTimeoutRef.current = null;
-    }
+    abortRecording();
 
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
     }
-
-    // Removed call-end system message per user request (times are now embedded in report cards)
 
     setIsConnected(false);
     setIsConnecting(false);
@@ -576,22 +562,12 @@ export function VoiceCounselorApp() {
     setIsMicMuted(muted);
     if (muted) {
       stopVadMonitoring();
+      abortRecording();
     } else {
       if (isConnected && !isPlayingAudio.current) {
         startVadMonitoring();
+        startSpeechRecognition();
       }
-    }
-
-    if (recognitionRef.current) {
-      try {
-        if (muted) {
-          recognitionRef.current.abort();
-        } else {
-          if (isConnected && !isPlayingAudio.current) {
-            recognitionRef.current.start();
-          }
-        }
-      } catch (e) {}
     }
   }
 
