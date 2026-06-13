@@ -1117,8 +1117,10 @@ body {
   border-radius: 0 !important;
   display: block !important;
 }
-.accordion-header:hover {
-  background-color: rgba(37, 99, 235, 0.08) !important;
+@media (hover: hover) {
+  .accordion-header:hover {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+  }
 }
 .accordion-header-content {
   display: flex;
@@ -1355,28 +1357,19 @@ body {
   color: #1e3a8a !important;
 }
 
-/* Copy Action: Slate Theme */
-.copy-action-btn {
+/* Model Pill Badge: Static Button Styling */
+.model-pill-badge {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 26px !important;
   background: #f8fafc !important;
   border: 1.5px solid #e2e8f0 !important;
   color: #475569 !important;
-}
-
-.copy-action-btn:hover {
-  background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-  color: #1e293b !important;
-}
-
-/* Copy Success: Emerald Green Theme */
-.copy-action-btn.copied-success {
-  background: #ecfdf5 !important;
-  border-color: #a7f3d0 !important;
-  color: #065f46 !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15) !important;
-}
-
-.copy-action-btn.copied-success:hover {
-  background: #d1fae5 !important;
-  border-color: #34d399 !important;
+  cursor: default !important;
+  pointer-events: none !important;
+  user-select: none !important;
 }

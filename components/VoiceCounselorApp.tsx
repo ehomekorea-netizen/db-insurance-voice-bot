@@ -1319,8 +1319,6 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 {message.role === "user" && <span className="sender-name">나</span>}
                 <MessageBubble
                   message={message}
-                  copiedId={copiedId}
-                  onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
                   onShare={(ans) => handleShareText(ans)}
                 />
               </div>
@@ -1460,13 +1458,9 @@ function cleanListText(text: string | undefined): string {
 
 function MessageBubble({
   message,
-  copiedId,
-  onCopy,
   onShare
 }: {
   message: ChatMessage;
-  copiedId: string | null;
-  onCopy: (ans: PolicyAnswer) => void;
   onShare: (ans: PolicyAnswer) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1482,12 +1476,13 @@ function MessageBubble({
 
   if (message.role === "assistant" && message.answer) {
     const ans = message.answer;
-    const isCopied = copiedId === message.id;
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
           <div className="card-top-left">
-            <span className="card-category-tag">약관 분석</span>
+            <button className="model-pill-badge" disabled>
+              {ans.modelName || "Gemini 3.1 Flash-Lite"}
+            </button>
           </div>
           <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
@@ -1511,17 +1506,6 @@ function MessageBubble({
               gap: "2px"
             }}>
               {isZoomed ? "글씨 🔍-" : "글씨 🔍+"}
-            </button>
-            <button className={`copy-action-btn ${isCopied ? "copied-success" : ""}`} onClick={() => onCopy(ans)}>
-              {isCopied ? "복사 완료! ✔" : (
-                <>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  복사
-                </>
-              )}
             </button>
           </div>
         </div>
