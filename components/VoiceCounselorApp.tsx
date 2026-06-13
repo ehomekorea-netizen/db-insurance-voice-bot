@@ -12,6 +12,54 @@ type ChatMessageInput =
   | { role: "system" | "user"; content: string; timestamp?: string }
   | { role: "assistant"; content: string; answer?: PolicyAnswer; timestamp?: string };
 
+function parseStreamedText(rawText: string) {
+  let analysis = "";
+  let summary = "";
+  let conditions: string[] = [];
+  let cautions: string[] = [];
+  
+  const analysisStart = rawText.indexOf("[분석 배경 및 이해]");
+  const summaryStart = rawText.indexOf("[요약]");
+  const conditionsStart = rawText.indexOf("[조건]");
+  const cautionsStart = rawText.indexOf("[주의사항]");
+  
+  if (analysisStart !== -1) {
+    const end = summaryStart !== -1 ? summaryStart : (conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : rawText.length));
+    analysis = rawText.substring(analysisStart + 12, end).trim();
+  }
+  
+  if (summaryStart !== -1) {
+    const end = conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : rawText.length);
+    summary = rawText.substring(summaryStart + 4, end).trim();
+  } else if (analysisStart === -1) {
+    summary = rawText; // Fallback during initial stream
+  }
+  
+  if (conditionsStart !== -1) {
+    const end = cautionsStart !== -1 ? cautionsStart : rawText.length;
+    const rawConditions = rawText.substring(conditionsStart + 4, end).trim();
+    conditions = rawConditions
+      .split("\n")
+      .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+      .filter(Boolean);
+  }
+  
+  if (cautionsStart !== -1) {
+    const rawCautions = rawText.substring(cautionsStart + 6).trim();
+    cautions = rawCautions
+      .split("\n")
+      .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
+      .filter(Boolean);
+  }
+  
+  return {
+    analysis,
+    summary,
+    conditions,
+    cautions
+  };
+}
+
 export function VoiceCounselorApp() {
   const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -686,7 +734,7 @@ export function VoiceCounselorApp() {
 
   async function requestPolicyAnswer(question: string, intent?: PolicyIntent, productHint?: string) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 11000); // 11s client-side timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s client-side timeout for stream connection/stalls
 
     try {
       const response = await fetch("/api/policy/answer", {
@@ -701,21 +749,19 @@ export function VoiceCounselorApp() {
       });
       clearTimeout(timeoutId);
 
-      let payload;
-      try {
-        payload = (await response.json()) as (PolicyAnswer & { isSimpleChat?: boolean }) | { error?: string };
-      } catch (jsonErr) {
-        throw new Error(`서버 응답 처리 중 에러가 발생했습니다 (HTTP ${response.status}).`);
+      if (!response.ok) {
+        throw new Error(`서버 응답 에러 (HTTP ${response.status})`);
       }
 
-      if (!response.ok || !isPolicyAnswer(payload)) {
-        throw new Error("error" in payload && payload.error ? payload.error : "약관 답변 생성에 실패했습니다.");
+      if (!response.body) {
+        throw new Error("응답 바디가 비어 있습니다.");
       }
 
-      const contentText = isConnected
-        ? `${payload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
-        : payload.summary;
-
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      
+      const tempMessageId = crypto.randomUUID();
       const now = new Date();
       const formattedTime = now.toLocaleString("ko-KR", {
         year: "numeric",
@@ -726,18 +772,132 @@ export function VoiceCounselorApp() {
         hour12: false
       });
 
-      addMessage({
-        role: "assistant",
-        content: contentText,
-        answer: payload,
-        timestamp: formattedTime
-      });
+      // Optimistically add an empty assistant card so we can stream into it
+      setMessages((current) => [
+        ...current,
+        {
+          id: tempMessageId,
+          role: "assistant",
+          content: "답변을 생성하는 중입니다...",
+          timestamp: formattedTime
+        } as ChatMessage
+      ]);
 
-      return payload;
+      let fullRawText = "";
+      let metadata: any = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        let lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        let currentEvent = "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith("event:")) {
+            currentEvent = trimmed.substring(6).trim();
+          } else if (trimmed.startsWith("data:")) {
+            const dataStr = trimmed.substring(5).trim();
+            if (currentEvent === "chunk") {
+              const textChunk = JSON.parse(dataStr);
+              fullRawText += textChunk;
+
+              const parsed = parseStreamedText(fullRawText);
+
+              // Update the assistant message in real-time
+              setMessages((current) =>
+                current.map((msg) =>
+                  msg.id === tempMessageId
+                    ? {
+                        ...msg,
+                        content: parsed.summary || "답변을 생성하는 중입니다...",
+                        answer: {
+                          id: tempMessageId,
+                          question,
+                          intent: intent || "policy_explanation",
+                          analysis: parsed.analysis,
+                          summary: parsed.summary,
+                          conditions: parsed.conditions,
+                          cautions: parsed.cautions,
+                          requiredInfo: metadata?.requiredInfo || [],
+                          citations: metadata?.citations || [],
+                          searchEngine: metadata?.searchEngine || "실시간 스트리밍",
+                          disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+                        }
+                      }
+                    : msg
+                )
+              );
+            } else if (currentEvent === "metadata") {
+              metadata = JSON.parse(dataStr);
+              
+              setMessages((current) =>
+                current.map((msg) =>
+                  msg.id === tempMessageId
+                    ? {
+                        ...msg,
+                        answer: {
+                          ...(msg.role === "assistant" ? msg.answer : {}),
+                          ...metadata,
+                          id: tempMessageId,
+                          question
+                        } as PolicyAnswer
+                      }
+                    : msg
+                )
+              );
+            } else if (currentEvent === "error") {
+              const errMsg = JSON.parse(dataStr);
+              throw new Error(errMsg);
+            }
+          }
+        }
+      }
+
+      const finalParsed = parseStreamedText(fullRawText);
+      const finalPayload = {
+        id: tempMessageId,
+        question,
+        intent: intent || "policy_explanation",
+        analysis: finalParsed.analysis,
+        summary: finalParsed.summary,
+        conditions: finalParsed.conditions,
+        cautions: finalParsed.cautions,
+        requiredInfo: metadata?.requiredInfo || [],
+        citations: metadata?.citations || [],
+        searchEngine: metadata?.searchEngine || "실시간 스트리밍",
+        isSimpleChat: metadata?.isSimpleChat || false,
+        disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+      } as PolicyAnswer & { isSimpleChat?: boolean };
+
+      // Finally, update the text to include the automated ending notification if connected
+      const contentText = isConnected
+        ? `${finalPayload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
+        : finalPayload.summary;
+
+      setMessages((current) =>
+        current.map((msg) =>
+          msg.id === tempMessageId
+            ? {
+                ...msg,
+                content: contentText,
+                answer: finalPayload
+              }
+            : msg
+        )
+      );
+
+      return finalPayload;
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === "AbortError") {
-        throw new Error("답변 생성 시간이 초과되었습니다 (11초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
+        throw new Error("답변 생성 시간이 초과되었습니다 (15초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
       }
       throw err;
     }
