@@ -1188,6 +1188,42 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
     });
   }
 
+  function handleShareText(ans: PolicyAnswer) {
+    const analysisText = ans.analysis
+      ? `🔍 질문 이해 및 분석 근거:\n${ans.analysis}\n\n`
+      : "";
+    const conditionsText = ans.conditions && ans.conditions.length > 0
+      ? `\n\n✅ 보장 대상 및 지급 조건:\n${ans.conditions.map((c) => `- ${c}`).join("\n")}`
+      : "";
+    const cautionsText = ans.cautions && ans.cautions.length > 0
+      ? `\n\n⚠️ 보장 제외 및 유의사항 (면책):\n${ans.cautions.map((c) => `- ${c}`).join("\n")}`
+      : "";
+    const requiredInfoText = ans.requiredInfo && ans.requiredInfo.length > 0
+      ? `\n\n📋 정확한 확인을 위해 필요한 정보:\n${ans.requiredInfo.map((i) => `- ${i}`).join("\n")}`
+      : "";
+
+    const copyText = `${analysisText}💡 핵심 요약:
+${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
+
+---
+* ${ans.disclaimer || "본 답변은 공식 공시자료 검색 기반 참고용이며, 최종 심사 결과와 다를 수 있습니다."}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({
+        title: "동목포 오멘토 약관 RAG 리포트",
+        text: copyText
+      }).catch((err) => {
+        console.warn("[SHARE] Web Share failed:", err);
+      });
+    } else {
+      navigator.clipboard.writeText(copyText).then(() => {
+        alert("카카오톡 등에 바로 붙여넣기할 수 있도록 리포트가 클립보드에 복사되었습니다!");
+      }).catch((err) => {
+        console.error("[SHARE] Clipboard copy failed:", err);
+      });
+    }
+  }
+
   return (
     <>
       {showCover && (
@@ -1283,6 +1319,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                   message={message}
                   copiedId={copiedId}
                   onCopy={(ans) => handleCopyText(message.id, message.content, ans)}
+                  onShare={(ans) => handleShareText(ans)}
                 />
               </div>
               {message.role === "user" && (
@@ -1422,11 +1459,13 @@ function cleanListText(text: string | undefined): string {
 function MessageBubble({
   message,
   copiedId,
-  onCopy
+  onCopy,
+  onShare
 }: {
   message: ChatMessage;
   copiedId: string | null;
   onCopy: (ans: PolicyAnswer) => void;
+  onShare: (ans: PolicyAnswer) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -1446,10 +1485,15 @@ function MessageBubble({
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
           <div className="card-top-left">
-            <span className="card-logo-badge">DB손보</span>
             <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Google (Serper)"})</span>
           </div>
           <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "2px" }}>
+                <path d="M12 2C6.48 2 2 5.52 2 10c0 2.75 1.68 5.16 4.25 6.43l-.84 3.12a.5.5 0 0 0 .73.54l3.66-2.03c.71.12 1.45.19 2.2.19 5.52 0 10-3.52 10-8s-4.48-8-10-8z"/>
+              </svg>
+              카톡 공유
+            </button>
             <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소" style={{
               fontSize: "10px",
               fontWeight: "700",

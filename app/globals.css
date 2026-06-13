@@ -1275,3 +1275,29 @@ body {
 .zoom-toggle-btn:active {
   transform: scale(0.95);
 }
+
+/* share-action-btn Premium Kakao styling */
+.share-action-btn {
+  font-size: 10px;
+  font-weight: 700;
+  background: #fef08a;
+  border: 1px solid #facc15;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #854d0e;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.share-action-btn:hover {
+  background: #fde047;
+  color: #713f12;
+  border-color: #eab308;
+}
+
+.share-action-btn:active {
+  transform: scale(0.95);
+}
