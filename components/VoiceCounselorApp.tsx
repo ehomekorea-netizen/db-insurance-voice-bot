@@ -110,6 +110,7 @@ export function VoiceCounselorApp() {
   const [isFinalEndingPending, setIsFinalEndingPending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const activeAnswerAbortControllerRef = useRef<AbortController | null>(null);
 
   // Web Audio API VAD Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -510,7 +511,8 @@ export function VoiceCounselorApp() {
   }
 
   async function handleUserVoiceQuery(question: string) {
-    console.log("[VOICE] handleUserVoiceQuery:", question);
+    const querySessionId = activeSessionIdRef.current; // Capture current session ID
+    console.log("[VOICE] handleUserVoiceQuery:", question, "Session ID:", querySessionId);
     // Reset VAD state to prevent double execution
     hasSpokenRef.current = false;
 
@@ -557,6 +559,13 @@ export function VoiceCounselorApp() {
       
       console.log("[VOICE] requestPolicyAnswer:", correctedQuestion);
       const payload = await requestPolicyAnswer(correctedQuestion);
+      
+      // If the session ID has changed (e.g. user manually ended the session or started a new one), ignore!
+      if (activeSessionIdRef.current !== querySessionId) {
+        console.log("[VOICE] Session changed. Ignoring policy answer result.");
+        return;
+      }
+
       setIsSearching(false);
 
       if (payload.isSimpleChat) {
@@ -573,6 +582,12 @@ export function VoiceCounselorApp() {
         stopRealtime(); // ALWAYS stop realtime after RAG answer
       }
     } catch (err: any) {
+      // If the session ID has changed, ignore the error callback to prevent state race condition!
+      if (activeSessionIdRef.current !== querySessionId) {
+        console.log("[VOICE] Session changed. Ignoring policy answer error.");
+        return;
+      }
+
       setIsSearching(false);
       setError(err instanceof Error ? err.message : "약관 검색 중 에러가 발생했습니다.");
       
@@ -672,6 +687,13 @@ export function VoiceCounselorApp() {
     console.log("[VOICE] stopRealtime");
     activeSessionIdRef.current = null; // Cancel any active startRealtime flow
 
+    // Abort any active policy answer request due to session stop
+    if (activeAnswerAbortControllerRef.current) {
+      console.log("[VOICE] Aborting active policy answer request due to session stop");
+      activeAnswerAbortControllerRef.current.abort();
+      activeAnswerAbortControllerRef.current = null;
+    }
+
     // Stop VAD monitoring loop
     stopVadMonitoring();
 
@@ -736,10 +758,21 @@ export function VoiceCounselorApp() {
   }
 
   async function requestPolicyAnswer(question: string, intent?: PolicyIntent, productHint?: string) {
+    // Abort any existing active request first
+    if (activeAnswerAbortControllerRef.current) {
+      console.log("[VOICE] Aborting previous active policy answer request");
+      activeAnswerAbortControllerRef.current.abort();
+      activeAnswerAbortControllerRef.current = null;
+    }
+
     const controller = new AbortController();
+    activeAnswerAbortControllerRef.current = controller;
+
+    let isTimeout = false;
     // 35s timeout covering the entire streaming process (fetch + reading chunks)
     const timeoutId = setTimeout(() => {
       console.warn("[VOICE] Request/Streaming timeout reached. Aborting.");
+      isTimeout = true;
       controller.abort();
     }, 35000);
 
@@ -904,11 +937,21 @@ export function VoiceCounselorApp() {
       );
 
       clearTimeout(timeoutId);
+      if (activeAnswerAbortControllerRef.current === controller) {
+        activeAnswerAbortControllerRef.current = null;
+      }
       return finalPayload;
     } catch (err: any) {
       clearTimeout(timeoutId);
+      if (activeAnswerAbortControllerRef.current === controller) {
+        activeAnswerAbortControllerRef.current = null;
+      }
       if (err.name === "AbortError") {
-        throw new Error("답변 생성 시간이 초과되었습니다 (35초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
+        if (isTimeout) {
+          throw new Error("답변 생성 시간이 초과되었습니다 (35초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
+        }
+        // If manually aborted, return a silent default payload so we don't throw errors
+        return { isSimpleChat: true } as any;
       }
       throw err;
     }
