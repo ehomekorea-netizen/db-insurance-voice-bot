@@ -315,9 +315,9 @@ export function VoiceCounselorApp() {
         console.log("[VOICE] [VAD RMS]", rms.toFixed(4), "Threshold:", VOICE_THRESHOLD.toFixed(4), "Noise Floor:", noiseFloorRef.current.toFixed(4));
       }
 
-      // Safety check: force stop after 20 seconds of continuous recording to prevent freezing
-      if (isRecordingRef.current && (now - recordingStartTimeRef.current > 20000)) {
-        console.log("[VOICE] Continuous recording reached 20s safety limit. Force stopping.");
+      // Safety check: force stop after 35 seconds of continuous recording to prevent freezing
+      if (isRecordingRef.current && (now - recordingStartTimeRef.current > 35000)) {
+        console.log("[VOICE] Continuous recording reached 35s safety limit. Force stopping.");
         hasSpokenRef.current = false;
         isRecordingRef.current = false;
         lastActiveTimeRef.current = now;
@@ -363,12 +363,12 @@ export function VoiceCounselorApp() {
           }
         }
       } else {
-        // If the user has spoken, and then is silent for 2.5 seconds, stop recording and send to Whisper
-        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 2500)) {
+        // If the user has spoken, and then is silent for 3.0 seconds, stop recording and send to Whisper
+        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 3000)) {
           hasSpokenRef.current = false;
           isRecordingRef.current = false;
           lastActiveTimeRef.current = now;
-          console.log("[VOICE] VAD silence detected (2.5s). Stopping recorder.");
+          console.log("[VOICE] VAD silence detected (3.0s). Stopping recorder.");
           
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             try {
