@@ -63,6 +63,21 @@ function parseStreamedText(rawText: string) {
   };
 }
 
+function generateUUID(): string {
+  if (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID) {
+    try {
+      return window.crypto.randomUUID();
+    } catch {
+      // fallback
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function VoiceCounselorApp() {
   const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -374,12 +389,40 @@ export function VoiceCounselorApp() {
       } else {
         // If the user has spoken, and then is silent for 3.0 seconds, stop recording and send to Whisper
         if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 3000)) {
+          const totalDuration = now - recordingStartTimeRef.current;
+          const speechDuration = totalDuration - 3000;
+
+          if (speechDuration < 1000) {
+            console.log(`[VOICE] Speech duration too short (${speechDuration}ms). Discarding as noise.`);
+            hasSpokenRef.current = false;
+            isRecordingRef.current = false;
+            lastActiveTimeRef.current = now;
+
+            if (mediaRecorderRef.current) {
+              const rec = mediaRecorderRef.current;
+              rec.onstop = null;
+              rec.ondataavailable = null;
+              try {
+                if (rec.state !== "inactive") {
+                  rec.stop();
+                }
+              } catch {}
+              mediaRecorderRef.current = null;
+            }
+            audioChunksRef.current = [];
+
+            setUserLiveTranscript("");
+            resetInactivityTimer();
+            vadRafIdRef.current = requestAnimationFrame(checkVolume);
+            return;
+          }
+
           hasSpokenRef.current = false;
           isRecordingRef.current = false;
           lastActiveTimeRef.current = now;
-          console.log("[VOICE] VAD silence detected (3.0s). Stopping recorder.");
+          console.log(`[VOICE] VAD silence detected (3.0s). Stopping recorder. Speech duration: ${speechDuration}ms`);
           resetInactivityTimer();
-          
+
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
             try {
               mediaRecorderRef.current.stop();
@@ -634,7 +677,7 @@ export function VoiceCounselorApp() {
       });
     }
 
-    const currentSessionId = crypto.randomUUID();
+    const currentSessionId = generateUUID();
     activeSessionIdRef.current = currentSessionId;
 
     try {
@@ -799,6 +842,8 @@ export function VoiceCounselorApp() {
       controller.abort();
     }, 35000);
 
+    let tempMessageId: string | null = null;
+
     try {
       const response = await fetch("/api/policy/answer", {
         method: "POST",
@@ -823,7 +868,7 @@ export function VoiceCounselorApp() {
       const decoder = new TextDecoder();
       let buffer = "";
       
-      const tempMessageId = crypto.randomUUID();
+      tempMessageId = generateUUID();
       const now = new Date();
       const formattedTime = now.toLocaleString("ko-KR", {
         year: "numeric",
@@ -969,6 +1014,9 @@ export function VoiceCounselorApp() {
       if (activeAnswerAbortControllerRef.current === controller) {
         activeAnswerAbortControllerRef.current = null;
       }
+      if (tempMessageId) {
+        setMessages((current) => current.filter((msg) => msg.id !== tempMessageId));
+      }
       if (err.name === "AbortError") {
         if (isTimeout) {
           throw new Error("답변 생성 시간이 초과되었습니다 (35초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
@@ -1009,7 +1057,7 @@ export function VoiceCounselorApp() {
     setMessages((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         ...message
       } as ChatMessage
     ]);

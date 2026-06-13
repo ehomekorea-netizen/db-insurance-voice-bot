@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { buildPolicyAnswer, classifyIntent, type PolicyIntent, samplePolicyChunks, type PolicyChunk } from "@/lib/policyKnowledge";
 import { correctInsuranceTerms } from "@/lib/koreanFuzzy";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
+
+function getUUIDShort(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    try {
+      return crypto.randomUUID().substring(0, 8);
+    } catch {
+      // fallback
+    }
+  }
+  return Math.random().toString(36).substring(2, 10);
+}
 
 type PolicyAnswerRequest = {
   question?: string;
@@ -184,8 +194,8 @@ export async function POST(request: Request) {
             reader = await getGeminiStreamReader(modelName, usedSearch);
           } catch (fallbackErr: any) {
             console.error(`[Gemini API Critical] Fallback also failed:`, fallbackErr.message || fallbackErr);
-            const primaryErrorMsg = err.name === "AbortError" ? "1차 실시간 검색 답변 생성 시간 초과(6.0초)" : `1차 실시간 검색 에러 (${err.message || err})`;
-            const fallbackErrorMsg = fallbackErr.name === "AbortError" ? "2차 빠른 답변 생성 시간 초과(3.0초)" : `2차 빠른 답변 에러 (${fallbackErr.message || fallbackErr})`;
+            const primaryErrorMsg = err.name === "AbortError" ? "1차 실시간 검색 답변 생성 시간 초과(12.0초)" : `1차 실시간 검색 에러 (${err.message || err})`;
+            const fallbackErrorMsg = fallbackErr.name === "AbortError" ? "2차 빠른 답변 생성 시간 초과(5.0초)" : `2차 빠른 답변 에러 (${fallbackErr.message || fallbackErr})`;
             
             controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(`답변 생성 엔진 호출 실패:\n- ${primaryErrorMsg}\n- ${fallbackErrorMsg}`)}\n\n`));
             controller.close();
@@ -263,7 +273,7 @@ export async function POST(request: Request) {
                 return "참고자료";
               };
               return {
-                id: `citation-${i + 1}-${crypto.randomUUID().substring(0, 8)}`,
+                id: `citation-${i + 1}-${getUUIDShort()}`,
                 title: cit.title,
                 section: getCitationSection(cit.url),
                 page: 1,
@@ -316,7 +326,7 @@ export async function POST(request: Request) {
               const resolvedTitle = getCleanTitle(web.title || "", url);
 
               return {
-                id: `citation-${i + 1}-${crypto.randomUUID().substring(0, 8)}`,
+                id: `citation-${i + 1}-${getUUIDShort()}`,
                 title: resolvedTitle,
                 section: getCitationSection(url),
                 page: 1,
