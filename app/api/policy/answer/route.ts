@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     let usedSearch = useWebSearch;
 
     try {
-      console.log(`[Gemini API] Calling ${modelName} with search grounding (timeout 6.5s)...`);
+      console.log(`[Gemini API] Calling ${modelName} with search grounding (timeout 6.0s)...`);
       response = await fetchWithTimeout(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
         {
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody)
         },
-        6500
+        6000
       );
 
       if (!response.ok) {
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
       // Fallback to gemini-2.5-flash without search grounding for high speed and avoiding Vercel timeouts
       modelName = "gemini-2.5-flash";
       usedSearch = false;
-      console.log(`[Gemini API Fallback] Calling ${modelName} WITHOUT search grounding (timeout 2.5s)...`);
+      console.log(`[Gemini API Fallback] Calling ${modelName} WITHOUT search grounding (timeout 3.0s)...`);
       const fallbackBody = {
         ...requestBody,
         tools: undefined
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(fallbackBody)
           },
-          2500
+          3000
         );
 
         if (!response.ok) {
@@ -183,15 +183,10 @@ export async function POST(request: Request) {
       } catch (fallbackErr: any) {
         console.error(`[Gemini API Critical] Fallback model ${modelName} also failed or timed out:`, fallbackErr.message || fallbackErr);
         
-        // Ultimate Fallback: Return local MVP sample data instead of throwing!
-        console.warn("[Gemini API Fallback] Google API completely unavailable or timed out. Returning local MVP sample data.");
-        const fallbackAnswer = buildPolicyAnswer({
-          question,
-          intent: body.intent ?? classifyIntent(question),
-          productHint
-        });
-        fallbackAnswer.searchEngine = "로컬 MVP 샘플 데이터 (네트워크 지연으로 인한 자동 전환)";
-        return NextResponse.json(fallbackAnswer);
+        const primaryErrorMsg = err.name === "AbortError" ? "1차 실시간 검색 답변 생성 시간 초과(6.0초)" : `1차 실시간 검색 에러 (${err.message || err})`;
+        const fallbackErrorMsg = fallbackErr.name === "AbortError" ? "2차 빠른 답변 생성 시간 초과(3.0초)" : `2차 빠른 답변 에러 (${fallbackErr.message || fallbackErr})`;
+        
+        throw new Error(`답변 생성 엔진 호출 실패:\n- ${primaryErrorMsg}\n- ${fallbackErrorMsg}`);
       }
     }
 
