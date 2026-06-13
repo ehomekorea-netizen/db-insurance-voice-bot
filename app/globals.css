@@ -1166,3 +1166,12 @@ body {
   font-size: 16px;
   display: inline-block;
 }
+
+/* Outline Overflow Prevention & Word Wrapping */
+.answer-card,
+.summary-text,
+.analysis-text,
+.bullet-list li {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}

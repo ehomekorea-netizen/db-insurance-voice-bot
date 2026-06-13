@@ -242,7 +242,7 @@ export async function POST(request: Request) {
           // Stream completed!
           // Extract citations from the full generated response
           const markdownCitations: Array<{ title: string; url: string }> = [];
-          const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\((https?:\/\/[^\)]+)\)/g;
+          const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\s*\((https?:\/\/[^\)]+)\)/g;
           let match;
           while ((match = citationRegex.exec(fullText)) !== null) {
             markdownCitations.push({
@@ -344,6 +344,8 @@ export async function POST(request: Request) {
               "해당 상품이 판매상품인지 판매중지 상품인지 여부"
             ]
           });
+
+          controller.enqueue(encoder.encode(`event: done\ndata: {}\n\n`));
 
           controller.close();
         } catch (streamErr: any) {

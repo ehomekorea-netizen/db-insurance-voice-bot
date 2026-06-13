@@ -13,31 +13,34 @@ type ChatMessageInput =
   | { role: "assistant"; content: string; answer?: PolicyAnswer; timestamp?: string };
 
 function parseStreamedText(rawText: string) {
+  const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\s*\((https?:\/\/[^\)]+)\)/g;
+  const cleanText = rawText.replace(citationRegex, "").trim();
+
   let analysis = "";
   let summary = "";
   let conditions: string[] = [];
   let cautions: string[] = [];
   
-  const analysisStart = rawText.indexOf("[분석 배경 및 이해]");
-  const summaryStart = rawText.indexOf("[요약]");
-  const conditionsStart = rawText.indexOf("[조건]");
-  const cautionsStart = rawText.indexOf("[주의사항]");
+  const analysisStart = cleanText.indexOf("[분석 배경 및 이해]");
+  const summaryStart = cleanText.indexOf("[요약]");
+  const conditionsStart = cleanText.indexOf("[조건]");
+  const cautionsStart = cleanText.indexOf("[주의사항]");
   
   if (analysisStart !== -1) {
-    const end = summaryStart !== -1 ? summaryStart : (conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : rawText.length));
-    analysis = rawText.substring(analysisStart + 12, end).trim();
+    const end = summaryStart !== -1 ? summaryStart : (conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : cleanText.length));
+    analysis = cleanText.substring(analysisStart + 12, end).trim();
   }
   
   if (summaryStart !== -1) {
-    const end = conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : rawText.length);
-    summary = rawText.substring(summaryStart + 4, end).trim();
+    const end = conditionsStart !== -1 ? conditionsStart : (cautionsStart !== -1 ? cautionsStart : cleanText.length);
+    summary = cleanText.substring(summaryStart + 4, end).trim();
   } else if (analysisStart === -1) {
-    summary = rawText; // Fallback during initial stream
+    summary = cleanText; // Fallback during initial stream
   }
   
   if (conditionsStart !== -1) {
-    const end = cautionsStart !== -1 ? cautionsStart : rawText.length;
-    const rawConditions = rawText.substring(conditionsStart + 4, end).trim();
+    const end = cautionsStart !== -1 ? cautionsStart : cleanText.length;
+    const rawConditions = cleanText.substring(conditionsStart + 4, end).trim();
     conditions = rawConditions
       .split("\n")
       .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
@@ -45,7 +48,7 @@ function parseStreamedText(rawText: string) {
   }
   
   if (cautionsStart !== -1) {
-    const rawCautions = rawText.substring(cautionsStart + 6).trim();
+    const rawCautions = cleanText.substring(cautionsStart + 6).trim();
     cautions = rawCautions
       .split("\n")
       .map((l) => l.replace(/^[\s\u200B\u200C\u200D\uFEFF\u00A0\u3000\-*•◦‣⁃]+/, "").trim())
@@ -734,7 +737,11 @@ export function VoiceCounselorApp() {
 
   async function requestPolicyAnswer(question: string, intent?: PolicyIntent, productHint?: string) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s client-side timeout for stream connection/stalls
+    // 35s timeout covering the entire streaming process (fetch + reading chunks)
+    const timeoutId = setTimeout(() => {
+      console.warn("[VOICE] Request/Streaming timeout reached. Aborting.");
+      controller.abort();
+    }, 35000);
 
     try {
       const response = await fetch("/api/policy/answer", {
@@ -747,7 +754,6 @@ export function VoiceCounselorApp() {
         }),
         signal: controller.signal
       });
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`서버 응답 에러 (HTTP ${response.status})`);
@@ -783,10 +789,14 @@ export function VoiceCounselorApp() {
         } as ChatMessage
       ]);
 
+      // Hide the searching spinner since we have started receiving the streaming response!
+      setIsSearching(false);
+
       let fullRawText = "";
       let metadata: any = null;
+      let currentEvent = ""; // Declared outside the loop to preserve state across chunk boundaries
 
-      while (true) {
+      outerLoop: while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
@@ -794,8 +804,6 @@ export function VoiceCounselorApp() {
         
         let lines = buffer.split("\n");
         buffer = lines.pop() || "";
-
-        let currentEvent = "";
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -852,6 +860,8 @@ export function VoiceCounselorApp() {
                     : msg
                 )
               );
+            } else if (currentEvent === "done") {
+              break outerLoop;
             } else if (currentEvent === "error") {
               const errMsg = JSON.parse(dataStr);
               throw new Error(errMsg);
@@ -893,11 +903,12 @@ export function VoiceCounselorApp() {
         )
       );
 
+      clearTimeout(timeoutId);
       return finalPayload;
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === "AbortError") {
-        throw new Error("답변 생성 시간이 초과되었습니다 (15초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
+        throw new Error("답변 생성 시간이 초과되었습니다 (35초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
       }
       throw err;
     }
@@ -1122,10 +1133,11 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
   );
 }
 
-// Helper to parse double asterisks (e.g. **bold**) and render them as JSX strong tags with soft brand blue highlight
+// Helper to parse double asterisks (e.g. **bold**) and markdown links [text](url) and render them as JSX with styling
 function renderFormattedText(text: string | undefined) {
   if (!text) return null;
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const regex = /(\*\*[^*]+\*\*|\[[^\]]+\]\s*\(\s*https?:\/\/[^\s\)]+\s*\))/g;
+  const parts = text.split(regex);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       const cleanText = part.slice(2, -2);
@@ -1145,6 +1157,29 @@ function renderFormattedText(text: string | undefined) {
           {cleanText}
         </strong>
       );
+    } else if (part.startsWith("[") && part.includes("]")) {
+      const closeBracketIndex = part.indexOf("]");
+      const linkText = part.slice(1, closeBracketIndex);
+      const urlPart = part.slice(closeBracketIndex + 1).trim();
+      if (urlPart.startsWith("(") && urlPart.endsWith(")")) {
+        const url = urlPart.slice(1, -1).trim();
+        return (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "#2563eb",
+              textDecoration: "underline",
+              wordBreak: "break-all",
+              fontWeight: "600"
+            }}
+          >
+            {linkText}
+          </a>
+        );
+      }
     }
     return part;
   });
