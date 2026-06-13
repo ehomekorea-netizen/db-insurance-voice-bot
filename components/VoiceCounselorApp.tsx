@@ -66,6 +66,8 @@ export function VoiceCounselorApp() {
   const vadRafIdRef = useRef<number | null>(null);
   const lastActiveTimeRef = useRef<number>(Date.now());
   const hasSpokenRef = useRef<boolean>(false);
+  const noiseFloorRef = useRef<number>(0.002);
+  const recordingStartTimeRef = useRef<number>(0);
 
   function abortRecording() {
     if (mediaRecorderRef.current) {
@@ -255,6 +257,8 @@ export function VoiceCounselorApp() {
     
     lastActiveTimeRef.current = Date.now();
     hasSpokenRef.current = false;
+    noiseFloorRef.current = 0.002; // Reset noise floor on VAD start
+    recordingStartTimeRef.current = 0; // Reset recording start time
     let frameCount = 0;
 
     const checkVolume = () => {
@@ -279,21 +283,45 @@ export function VoiceCounselorApp() {
         sum += v * v;
       }
       const rms = Math.sqrt(sum / bufferLength);
-
-      // Volume threshold for active speaking (lowered to 0.003 for quiet voice sensitivity)
-      const VOICE_THRESHOLD = 0.003; 
       const now = Date.now();
+
+      // Slowly adapt noise floor when not speaking to handle ambient room noise
+      if (!hasSpokenRef.current) {
+        noiseFloorRef.current = noiseFloorRef.current * 0.95 + rms * 0.05;
+      }
+
+      // Dynamic voice threshold: noise floor + 0.006 (minimum 0.008 to ignore small background changes)
+      const VOICE_THRESHOLD = Math.max(0.008, noiseFloorRef.current + 0.006);
 
       frameCount++;
       if (frameCount % 30 === 0) {
-        console.log("[VOICE] [VAD RMS]", rms, "Threshold:", VOICE_THRESHOLD);
+        console.log("[VOICE] [VAD RMS]", rms.toFixed(4), "Threshold:", VOICE_THRESHOLD.toFixed(4), "Noise Floor:", noiseFloorRef.current.toFixed(4));
+      }
+
+      // Safety check: force stop after 10 seconds of continuous recording to prevent freezing
+      if (isRecordingRef.current && (now - recordingStartTimeRef.current > 10000)) {
+        console.log("[VOICE] Continuous recording reached 10s safety limit. Force stopping.");
+        hasSpokenRef.current = false;
+        isRecordingRef.current = false;
+        lastActiveTimeRef.current = now;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          try {
+            mediaRecorderRef.current.stop();
+            console.log("[VOICE] MediaRecorder force stopped");
+            setUserLiveTranscript("음성을 분석하는 중입니다...");
+          } catch (e) {
+            console.error("[VOICE] Failed to force stop MediaRecorder:", e);
+          }
+        }
+        vadRafIdRef.current = requestAnimationFrame(checkVolume);
+        return;
       }
 
       if (rms > VOICE_THRESHOLD) {
         lastActiveTimeRef.current = now;
         if (!hasSpokenRef.current) {
           hasSpokenRef.current = true;
-          console.log("[VOICE] speech detected. RMS:", rms);
+          console.log("[VOICE] speech detected. RMS:", rms, "Threshold:", VOICE_THRESHOLD);
           
           // Start MediaRecorder if not already recording (deliver chunks every 250ms)
           if (!isRecordingRef.current) {
@@ -306,6 +334,7 @@ export function VoiceCounselorApp() {
               if (mediaRecorderRef.current) {
                 mediaRecorderRef.current.start(250);
                 isRecordingRef.current = true;
+                recordingStartTimeRef.current = now;
                 console.log("[VOICE] MediaRecorder started");
                 setUserLiveTranscript("말씀을 듣고 있습니다...");
               } else {
