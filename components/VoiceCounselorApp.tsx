@@ -189,6 +189,9 @@ export function VoiceCounselorApp() {
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioContextClass();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
       audioContextRef.current = audioCtx;
 
       const analyser = audioCtx.createAnalyser();
@@ -216,7 +219,8 @@ export function VoiceCounselorApp() {
         const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         audioChunksRef.current = [];
         
-        if (audioBlob.size < 1000) {
+        console.log("[MediaRecorder] Recording stopped. Blob size:", audioBlob.size, "MIME type:", audioBlob.type);
+        if (audioBlob.size < 100) {
           setUserLiveTranscript("");
           isTranscribingRef.current = false;
           return;
@@ -241,15 +245,15 @@ export function VoiceCounselorApp() {
         }
         const rms = Math.sqrt(sum / bufferLength);
 
-        // Volume threshold for active speaking
-        const VOICE_THRESHOLD = 0.015; 
+        // Volume threshold for active speaking (lowered to 0.01 for better sensitivity)
+        const VOICE_THRESHOLD = 0.01; 
         const now = Date.now();
 
         if (rms > VOICE_THRESHOLD) {
           lastActiveTimeRef.current = now;
           if (!hasSpokenRef.current) {
             hasSpokenRef.current = true;
-            console.log("[VAD] Voice activity detected");
+            console.log("[VAD] Voice activity detected. RMS:", rms);
             
             // Start MediaRecorder if not already recording
             if (mediaRecorderRef.current && !isRecordingRef.current) {
