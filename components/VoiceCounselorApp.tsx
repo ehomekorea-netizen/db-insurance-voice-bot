@@ -111,6 +111,7 @@ export function VoiceCounselorApp() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeAnswerAbortControllerRef = useRef<AbortController | null>(null);
+  const isRequestActiveRef = useRef<boolean>(false);
 
   // Web Audio API VAD Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -401,7 +402,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending) {
+    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending && !isRequestActiveRef.current) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
@@ -513,6 +514,9 @@ export function VoiceCounselorApp() {
   async function handleUserVoiceQuery(question: string) {
     const querySessionId = activeSessionIdRef.current; // Capture current session ID
     console.log("[VOICE] handleUserVoiceQuery:", question, "Session ID:", querySessionId);
+    
+    isRequestActiveRef.current = true; // Set active request flag
+
     // Reset VAD state to prevent double execution
     hasSpokenRef.current = false;
 
@@ -593,6 +597,9 @@ export function VoiceCounselorApp() {
       
       isPlayingAudio.current = false;
       stopRealtime(); // ALWAYS stop realtime on error to prevent mic leakage
+    } finally {
+      isRequestActiveRef.current = false;
+      resetInactivityTimer();
     }
   }
 
