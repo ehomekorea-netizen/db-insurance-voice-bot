@@ -156,8 +156,8 @@ export async function POST(request: Request) {
       }
     } catch (err: any) {
       console.warn(`[Gemini API Warning] ${modelName} with search grounding failed or timed out:`, err.message || err);
-      // Fallback to gemini-2.0-flash without search grounding for high speed and avoiding Vercel timeouts
-      modelName = "gemini-2.0-flash";
+      // Fallback to gemini-2.5-flash without search grounding for high speed and avoiding Vercel timeouts
+      modelName = "gemini-2.5-flash";
       usedSearch = false;
       console.log(`[Gemini API Fallback] Calling ${modelName} WITHOUT search grounding (timeout 2.5s)...`);
       const fallbackBody = {
@@ -322,8 +322,8 @@ export async function POST(request: Request) {
     }
 
     const usedEngine = modelName === "gemini-2.5-flash"
-      ? (usedSearch ? "실시간 검색 답변(Gemini 2.5 flash)" : "빠른 답변(Gemini 2.5 flash)")
-      : (usedSearch ? "실시간 검색 답변(Gemini 2.0 flash)" : "빠른 답변(Gemini 2.0 flash - 실시간 검색 시간초과)");
+      ? (usedSearch ? "실시간 검색 답변(Gemini 2.5 flash)" : "빠른 답변(Gemini 2.5 flash - 실시간 검색 시간초과)")
+      : (usedSearch ? "실시간 검색 답변(Gemini 2.0-flash는 폐기됨)" : "빠른 답변(Gemini 2.0-flash는 폐기됨)");
 
     return NextResponse.json({
       id: crypto.randomUUID(),
