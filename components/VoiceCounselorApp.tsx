@@ -47,7 +47,7 @@ export function VoiceCounselorApp() {
   const isTranscribingRef = useRef<boolean>(false);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPlayingAudio = useRef(false);
-  const isFinalEndingPending = useRef(false);
+  const [isFinalEndingPending, setIsFinalEndingPending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
 
@@ -116,18 +116,21 @@ export function VoiceCounselorApp() {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          URL.revokeObjectURL(url);
           resolve();
         };
         audio.onerror = (e) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          URL.revokeObjectURL(url);
           reject(e);
         };
         audio.play().catch((err) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+          URL.revokeObjectURL(url);
           reject(err);
         });
       });
@@ -178,120 +181,96 @@ export function VoiceCounselorApp() {
     });
   }
 
-  // Start Web Audio API VAD and initialize MediaRecorder
-  async function startVadMonitoring() {
-    try {
-      if (typeof window === "undefined") return;
-      stopVadMonitoring();
+  // Start VAD volume monitoring using the pre-initialized analyser
+  function startVadMonitoring() {
+    if (typeof window === "undefined") return;
+    console.log("[VOICE] startVadMonitoring");
+    
+    // Stop any existing loop first
+    if (vadRafIdRef.current) {
+      cancelAnimationFrame(vadRafIdRef.current);
+      vadRafIdRef.current = null;
+    }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
+    if (!analyserRef.current) {
+      console.warn("[VOICE] [VAD] Analyser not initialized. Cannot monitor.");
+      return;
+    }
 
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-      if (audioCtx.state === "suspended") {
-        await audioCtx.resume();
-      }
-      audioContextRef.current = audioCtx;
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    lastActiveTimeRef.current = Date.now();
+    hasSpokenRef.current = false;
+    let frameCount = 0;
 
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      analyserRef.current = analyser;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      
-      lastActiveTimeRef.current = Date.now();
-      hasSpokenRef.current = false;
-
-      // Initialize MediaRecorder bound to this stream
-      const recorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        audioChunksRef.current = [];
-        
-        console.log("[MediaRecorder] Recording stopped. Blob size:", audioBlob.size, "MIME type:", audioBlob.type);
-        if (audioBlob.size < 100) {
-          setUserLiveTranscript("");
-          isTranscribingRef.current = false;
-          return;
-        }
-
-        await handleAudioTranscription(audioBlob);
-      };
-      mediaRecorderRef.current = recorder;
-
-      const checkVolume = () => {
-        if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted || isTranscribingRef.current) {
-          vadRafIdRef.current = requestAnimationFrame(checkVolume);
-          return;
-        }
-
-        analyserRef.current.getByteTimeDomainData(dataArray);
-
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          const v = (dataArray[i] - 128) / 128;
-          sum += v * v;
-        }
-        const rms = Math.sqrt(sum / bufferLength);
-
-        // Volume threshold for active speaking (lowered to 0.01 for better sensitivity)
-        const VOICE_THRESHOLD = 0.01; 
-        const now = Date.now();
-
-        if (rms > VOICE_THRESHOLD) {
-          lastActiveTimeRef.current = now;
-          if (!hasSpokenRef.current) {
-            hasSpokenRef.current = true;
-            console.log("[VAD] Voice activity detected. RMS:", rms);
-            
-            // Start MediaRecorder if not already recording
-            if (mediaRecorderRef.current && !isRecordingRef.current) {
-              try {
-                audioChunksRef.current = [];
-                mediaRecorderRef.current.start();
-                isRecordingRef.current = true;
-                setUserLiveTranscript("말씀을 듣고 있습니다...");
-              } catch (e) {
-                console.error("Failed to start MediaRecorder:", e);
-              }
-            }
-          }
-        } else {
-          // If the user has spoken, and then is silent for 1.5 seconds, stop recording and send to Whisper
-          if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 1500)) {
-            hasSpokenRef.current = false;
-            isRecordingRef.current = false;
-            lastActiveTimeRef.current = now;
-            
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-              try {
-                mediaRecorderRef.current.stop();
-                setUserLiveTranscript("음성을 분석하는 중입니다...");
-              } catch (e) {
-                console.error("Failed to stop MediaRecorder:", e);
-              }
-            }
-          }
-        }
-
+    const checkVolume = () => {
+      if (!analyserRef.current || !isConnected || isSearching || isPlayingAudio.current || isMicMuted || isTranscribingRef.current) {
         vadRafIdRef.current = requestAnimationFrame(checkVolume);
-      };
+        return;
+      }
+
+      analyserRef.current.getByteTimeDomainData(dataArray);
+
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = (dataArray[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+
+      // Volume threshold for active speaking (lowered to 0.003 for quiet voice sensitivity)
+      const VOICE_THRESHOLD = 0.003; 
+      const now = Date.now();
+
+      frameCount++;
+      if (frameCount % 30 === 0) {
+        console.log("[VOICE] [VAD RMS]", rms, "Threshold:", VOICE_THRESHOLD);
+      }
+
+      if (rms > VOICE_THRESHOLD) {
+        lastActiveTimeRef.current = now;
+        if (!hasSpokenRef.current) {
+          hasSpokenRef.current = true;
+          console.log("[VOICE] speech detected. RMS:", rms);
+          
+          // Start MediaRecorder if not already recording
+          if (mediaRecorderRef.current && !isRecordingRef.current) {
+            try {
+              audioChunksRef.current = [];
+              mediaRecorderRef.current.start();
+              isRecordingRef.current = true;
+              console.log("[VOICE] MediaRecorder started");
+              setUserLiveTranscript("말씀을 듣고 있습니다...");
+            } catch (e) {
+              console.error("[VOICE] Failed to start MediaRecorder:", e);
+            }
+          }
+        }
+      } else {
+        // If the user has spoken, and then is silent for 1.5 seconds, stop recording and send to Whisper
+        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 1500)) {
+          hasSpokenRef.current = false;
+          isRecordingRef.current = false;
+          lastActiveTimeRef.current = now;
+          console.log("[VOICE] VAD silence detected (1.5s). Stopping recorder.");
+          
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            try {
+              mediaRecorderRef.current.stop();
+              console.log("[VOICE] MediaRecorder stopped");
+              setUserLiveTranscript("음성을 분석하는 중입니다...");
+            } catch (e) {
+              console.error("[VOICE] Failed to stop MediaRecorder:", e);
+            }
+          }
+        }
+      }
 
       vadRafIdRef.current = requestAnimationFrame(checkVolume);
-    } catch (err) {
-      console.warn("VAD monitoring failed to initialize:", err);
-    }
+    };
+
+    vadRafIdRef.current = requestAnimationFrame(checkVolume);
   }
 
   function stopVadMonitoring() {
@@ -299,17 +278,6 @@ export function VoiceCounselorApp() {
       cancelAnimationFrame(vadRafIdRef.current);
       vadRafIdRef.current = null;
     }
-    if (audioContextRef.current) {
-      if (audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch(() => {});
-      }
-      audioContextRef.current = null;
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((track) => track.stop());
-      micStreamRef.current = null;
-    }
-    analyserRef.current = null;
   }
 
   // Monitor 20-second inactivity timer
@@ -319,7 +287,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = null;
     }
 
-    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending.current) {
+    if (isConnected && !isMicMuted && !isSearching && !isPlayingAudio.current && !isFinalEndingPending) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("20초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
@@ -335,7 +303,7 @@ export function VoiceCounselorApp() {
         clearTimeout(inactivityTimerRef.current);
       }
     };
-  }, [isConnected, isMicMuted, isSearching, isFinalEndingPending.current]);
+  }, [isConnected, isMicMuted, isSearching, isFinalEndingPending]);
 
   // Monitor session duration & enforce 3-minute hard cap
   useEffect(() => {
@@ -380,11 +348,13 @@ export function VoiceCounselorApp() {
   }, [messages, liveTranscript, isSearching, userLiveTranscript]);
 
   function startSpeechRecognition() {
+    console.log("[VOICE] startSpeechRecognition");
     abortRecording();
     startVadMonitoring();
   }
 
   async function handleAudioTranscription(blob: Blob) {
+    console.log("[VOICE] handleAudioTranscription start");
     isTranscribingRef.current = true;
     setUserLiveTranscript("음성을 분석하는 중입니다...");
 
@@ -398,18 +368,17 @@ export function VoiceCounselorApp() {
       });
 
       if (!response.ok) {
-        throw new Error("STT transcription failed");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `STT transcription failed (HTTP ${response.status})`);
       }
 
       const data = await response.json();
       const transcribedText = (data.text || "").trim();
-      console.log("[Whisper STT] Result:", transcribedText);
+      console.log("[VOICE] Whisper API response:", transcribedText);
 
-      // Filter out empty, short, or meaningless words
-      const ignoredWords = ["아", "어", "음", "네", "예", "저기", "씁", "에", "그", "아 예", "어 예"];
-      
-      if (!transcribedText || transcribedText.length < 3 || ignoredWords.includes(transcribedText)) {
-        console.log("[Whisper STT Filter] Ignored noise/short query:", transcribedText);
+      // Filter out empty transcription
+      if (!transcribedText) {
+        console.log("[VOICE] [Whisper STT Filter] Empty transcription, ignore.");
         setUserLiveTranscript("");
         isTranscribingRef.current = false;
         return;
@@ -419,14 +388,16 @@ export function VoiceCounselorApp() {
       isTranscribingRef.current = false;
       await handleUserVoiceQuery(transcribedText);
 
-    } catch (err) {
-      console.error("Transcription error:", err);
+    } catch (err: any) {
+      console.error("[VOICE] Transcription error:", err);
       setUserLiveTranscript("");
       isTranscribingRef.current = false;
+      setError(err instanceof Error ? err.message : "음성을 텍스트로 변환하는 중 오류가 발생했습니다.");
     }
   }
 
   async function handleUserVoiceQuery(question: string) {
+    console.log("[VOICE] handleUserVoiceQuery:", question);
     // Reset VAD state to prevent double execution
     hasSpokenRef.current = false;
 
@@ -448,6 +419,7 @@ export function VoiceCounselorApp() {
       // Play local static guide audio immediately to minimize latency (fire-and-forget)
       playLocalGuideAudio();
       
+      console.log("[VOICE] requestPolicyAnswer:", correctedQuestion);
       const payload = await requestPolicyAnswer(correctedQuestion);
       setIsSearching(false);
 
@@ -462,9 +434,9 @@ export function VoiceCounselorApp() {
         }
       } else {
         // B. RAG Policy Answer
-        isFinalEndingPending.current = true;
+        setIsFinalEndingPending(true);
         await playTts("답변과 함께 상담은 자동종료됩니다.");
-        isFinalEndingPending.current = false;
+        setIsFinalEndingPending(false);
         stopRealtime();
       }
     } catch (err: any) {
@@ -483,6 +455,7 @@ export function VoiceCounselorApp() {
   }
 
   async function startRealtime() {
+    console.log("[VOICE] startRealtime");
     setError(null);
     setIsConnecting(true);
 
@@ -490,23 +463,87 @@ export function VoiceCounselorApp() {
     activeSessionIdRef.current = currentSessionId;
 
     try {
-      // 1. Request microphone permission first to unlock mobile audio context and ask for consent immediately
-      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop()); // Immediately release the stream
+      // 1. Request microphone permission immediately under user gesture context
+      if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("마이크 입력을 지원하지 않는 브라우저입니다.");
       }
 
-      // Check if session was cancelled during permission request
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+
+      // Check if session was cancelled during stream acquisition
       if (activeSessionIdRef.current !== currentSessionId) {
         console.log("[startRealtime] Session cancelled during permission check.");
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
+
+      // 2. Initialize AudioContext and VAD Nodes under user click context to prevent Autoplay block
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+      audioContextRef.current = audioCtx;
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyserRef.current = analyser;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      // 3. Select supported MIME type for Safari / Mobile compatibility
+      let mimeType = "audio/webm";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+          mimeType = "audio/ogg;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          mimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
+          mimeType = "audio/wav";
+        }
+      }
+      console.log("[VOICE] Selected MediaRecorder MIME type:", mimeType);
+
+      // 4. Initialize MediaRecorder bound to this stream
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType });
+      } catch (e) {
+        console.warn("[VOICE] MediaRecorder with mimeType failed, falling back to default.", e);
+        recorder = new MediaRecorder(stream);
+      }
+
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        
+        console.log("[VOICE] MediaRecorder stopped. Blob size:", audioBlob.size, "MIME type:", audioBlob.type);
+        if (audioBlob.size < 100) {
+          setUserLiveTranscript("");
+          isTranscribingRef.current = false;
+          return;
+        }
+
+        await handleAudioTranscription(audioBlob);
+      };
+      mediaRecorderRef.current = recorder;
+      console.log("[VOICE] MediaRecorder initialized. MIME:", recorder.mimeType);
 
       setIsConnected(true);
       setIsConnecting(false);
       isPlayingAudio.current = true;
 
-      // 2. Play welcome greeting after permission is granted
+      // 5. Play welcome greeting
       addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
       await playTts("PA님 무엇을 도와드릴까요?");
 
@@ -518,7 +555,7 @@ export function VoiceCounselorApp() {
 
       isPlayingAudio.current = false;
       if (!isMicMuted) {
-        startSpeechRecognition();
+        startSpeechRecognition(); // Kicks off startVadMonitoring loop!
       }
     } catch (cause) {
       if (activeSessionIdRef.current === currentSessionId) {
@@ -536,9 +573,10 @@ export function VoiceCounselorApp() {
   }
 
   function stopRealtime() {
+    console.log("[VOICE] stopRealtime");
     activeSessionIdRef.current = null; // Cancel any active startRealtime flow
 
-    // Stop VAD monitoring
+    // Stop VAD monitoring loop
     stopVadMonitoring();
 
     if (activeAudioRef.current) {
@@ -557,7 +595,7 @@ export function VoiceCounselorApp() {
     setIsConnecting(false);
     setIsMicMuted(false);
     isPlayingAudio.current = false;
-    isFinalEndingPending.current = false;
+    setIsFinalEndingPending(false);
     setUserLiveTranscript("");
     setLiveTranscript("");
   }
