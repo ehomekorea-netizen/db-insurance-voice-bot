@@ -175,14 +175,23 @@ export async function POST(request: Request) {
           },
           2500
         );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Gemini API HTTP ${response.status}: ${errText}`);
+        }
       } catch (fallbackErr: any) {
         console.error(`[Gemini API Critical] Fallback model ${modelName} also failed or timed out:`, fallbackErr.message || fallbackErr);
-        throw new Error(`답변 생성 엔진 호출 실패: ${fallbackErr.message || fallbackErr}`);
-      }
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Gemini API HTTP ${response.status} (Model: ${modelName}): ${errText}`);
+        
+        // Ultimate Fallback: Return local MVP sample data instead of throwing!
+        console.warn("[Gemini API Fallback] Google API completely unavailable or timed out. Returning local MVP sample data.");
+        const fallbackAnswer = buildPolicyAnswer({
+          question,
+          intent: body.intent ?? classifyIntent(question),
+          productHint
+        });
+        fallbackAnswer.searchEngine = "로컬 MVP 샘플 데이터 (네트워크 지연으로 인한 자동 전환)";
+        return NextResponse.json(fallbackAnswer);
       }
     }
 
