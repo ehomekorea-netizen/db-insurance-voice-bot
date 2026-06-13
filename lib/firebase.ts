@@ -202,3 +202,106 @@ function parseFirestoreDoc(doc: any): FirestoreUser | null {
     whisperCost: parseCost(fields.whisperCost)
   };
 }
+
+export interface ChatLogEntry {
+  id: string;
+  userId: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+// 사용자 질문/답변 기록 저장
+export async function saveChatMessage(
+  userId: string,
+  role: "user" | "assistant",
+  content: string
+): Promise<boolean> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return false;
+
+  try {
+    const fields: any = {
+      userId: { stringValue: userId },
+      role: { stringValue: role },
+      content: { stringValue: content },
+      timestamp: { stringValue: new Date().toISOString() }
+    };
+
+    const res = await fetch(`${baseUrl}/chat_logs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[FIREBASE] saveChatMessage POST error: ${res.status} - ${errText}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[FIREBASE] saveChatMessage error for user ${userId}:`, err);
+    return false;
+  }
+}
+
+// 사용자별 대화 히스토리 전체 조회
+export async function getUserChatLogs(userId: string): Promise<ChatLogEntry[]> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return [];
+
+  try {
+    const res = await fetch(`${baseUrl}:runQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "chat_logs" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "userId" },
+              op: "EQUAL",
+              value: { stringValue: userId }
+            }
+          }
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[FIREBASE] getUserChatLogs runQuery error: ${res.status} - ${errText}`);
+      return [];
+    }
+
+    const docs = await res.json();
+    if (!Array.isArray(docs)) return [];
+
+    const logs: ChatLogEntry[] = [];
+    for (const item of docs) {
+      if (item.document && item.document.fields) {
+        const doc = item.document;
+        const nameParts = doc.name.split("/");
+        const id = nameParts[nameParts.length - 1];
+        const fields = doc.fields;
+        
+        logs.push({
+          id,
+          userId: fields.userId?.stringValue || "",
+          role: (fields.role?.stringValue || "user") as "user" | "assistant",
+          content: fields.content?.stringValue || "",
+          timestamp: fields.timestamp?.stringValue || new Date().toISOString()
+        });
+      }
+    }
+
+    // 시간 오름차순 정렬
+    logs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return logs;
+  } catch (err) {
+    console.error(`[FIREBASE] getUserChatLogs error for user ${userId}:`, err);
+    return [];
+  }
+}
+

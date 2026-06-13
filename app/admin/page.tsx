@@ -21,6 +21,12 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
 
+  // Chat Logs Modal States
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserNickname, setSelectedUserNickname] = useState<string>("");
+  const [chatLogs, setChatLogs] = useState<any[]>([]);
+  const [isLogsLoading, setIsLogsLoading] = useState(false);
+
   // Auto restore login session from localStorage
   useEffect(() => {
     const savedToken = localStorage.getItem("admin_session_token");
@@ -135,6 +141,33 @@ export default function AdminPage() {
     }
   };
 
+  // Fetch user's chat logs
+  const handleViewChatLogs = async (userId: string, nickname: string) => {
+    setSelectedUserId(userId);
+    setSelectedUserNickname(nickname);
+    setIsLogsLoading(true);
+    setChatLogs([]);
+    try {
+      const res = await fetch(`/api/admin/messages?userId=${userId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error("대화 기록을 가져오지 못했습니다.");
+      }
+      const data = await res.json();
+      if (data.success) {
+        setChatLogs(data.logs || []);
+      }
+    } catch (err: any) {
+      alert(err.message || "대화 기록 조회 실패");
+    } finally {
+      setIsLogsLoading(false);
+    }
+  };
+
   const formatDate = (isoStr: string) => {
     try {
       const date = new Date(isoStr);
@@ -203,13 +236,18 @@ export default function AdminPage() {
         <div className="admin-card-panel">
           <div className="panel-header">
             <h2>가입 사용자 목록 ({users.length}명)</h2>
-            <button
-              onClick={() => token && fetchUserList(token)}
-              className="admin-refresh-btn"
-              disabled={isLoading}
-            >
-              새로고침 🔄
-            </button>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="mobile-scroll-tip">
+                ← 터치 스크롤 가능 →
+              </span>
+              <button
+                onClick={() => token && fetchUserList(token)}
+                className="admin-refresh-btn"
+                disabled={isLoading}
+              >
+                새로고침 🔄
+              </button>
+            </div>
           </div>
 
           {error && <div className="admin-error-banner">{error}</div>}
@@ -266,19 +304,28 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          onClick={() => toggleUserStatus(user.id, user.status)}
-                          className={`admin-action-btn ${
-                            user.status === "approved" ? "block-action" : "approve-action"
-                          }`}
-                          disabled={actionUserId === user.id}
-                        >
-                          {actionUserId === user.id
-                            ? "처리 중..."
-                            : user.status === "approved"
-                            ? "차단하기"
-                            : "승인/해제"}
-                        </button>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => toggleUserStatus(user.id, user.status)}
+                            className={`admin-action-btn ${
+                              user.status === "approved" ? "block-action" : "approve-action"
+                            }`}
+                            disabled={actionUserId === user.id}
+                          >
+                            {actionUserId === user.id
+                              ? "처리 중..."
+                              : user.status === "approved"
+                              ? "차단하기"
+                              : "승인/해제"}
+                          </button>
+                          <button
+                            onClick={() => handleViewChatLogs(user.id, user.nickname)}
+                            className="admin-action-btn approve-action"
+                            style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)" }}
+                          >
+                            대화 기록
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -288,6 +335,48 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+
+      {selectedUserId && (
+        <div className="admin-modal-overlay" onClick={() => setSelectedUserId(null)}>
+          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <h2>{selectedUserNickname}님의 대화 기록</h2>
+                <p>카카오 ID: {selectedUserId}</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedUserId(null)}>
+                &times;
+              </button>
+            </header>
+            
+            <div className="modal-body">
+              {isLogsLoading ? (
+                <div className="modal-loading">대화 기록을 불러오는 중...</div>
+              ) : chatLogs.length === 0 ? (
+                <div className="modal-empty">아직 기록된 대화가 없습니다.</div>
+              ) : (
+                <div className="modal-chat-list">
+                  {chatLogs.map((log) => (
+                    <div key={log.id} className={`modal-chat-item ${log.role}`}>
+                      <div className="chat-bubble-header">
+                        <span className="chat-sender">
+                          {log.role === "user" ? selectedUserNickname : "프로미"}
+                        </span>
+                        <span className="chat-time">
+                          {formatDate(log.timestamp)}
+                        </span>
+                      </div>
+                      <div className="chat-bubble-content">
+                        {log.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

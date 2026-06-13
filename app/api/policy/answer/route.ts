@@ -71,6 +71,18 @@ export async function POST(request: Request) {
   // 디버깅용 로그 추가: Vercel 콘솔 로그에서 실제 키 유입 상태를 식별하기 위함
   console.log(`[GEMINI_API_KEY Debug] 로드 여부: ${!!geminiKey}, 길이: ${geminiKey ? geminiKey.length : 0}, 앞 5글자: "${geminiKey ? geminiKey.substring(0, 5) : "없음"}"`);
 
+  // Save user's question to chat logs in the background (non-blocking)
+  if (userId && question) {
+    try {
+      const { saveChatMessage } = await import("@/lib/firebase");
+      saveChatMessage(userId, "user", question).catch(err => {
+        console.error("[Firebase Log] Failed to save user message:", err);
+      });
+    } catch (importErr) {
+      console.error("[Firebase Log] Failed to import saveChatMessage:", importErr);
+    }
+  }
+
   // FALLBACK: If Gemini API Key is not configured, fallback to local sample data
   if (!geminiKey || geminiKey === "your-gemini-api-key-here" || geminiKey.trim() === "") {
     console.warn("경고: GEMINI_API_KEY가 설정되지 않아 로컬 MVP 샘플 데이터로 응답합니다.");
@@ -81,6 +93,16 @@ export async function POST(request: Request) {
     });
     fallbackAnswer.searchEngine = "로컬 MVP 샘플 데이터";
     fallbackAnswer.modelName = "Gemini 3.1 Flash-Lite";
+
+    // Save fallback response as assistant message in the background
+    if (userId) {
+      try {
+        const { saveChatMessage } = await import("@/lib/firebase");
+        const answerText = `[요약]\n${fallbackAnswer.summary}\n\n[조건]\n${fallbackAnswer.conditions.join("\n")}\n\n[주의사항]\n${fallbackAnswer.cautions.join("\n")}`;
+        saveChatMessage(userId, "assistant", answerText).catch(() => {});
+      } catch {}
+    }
+
     return NextResponse.json(fallbackAnswer);
   }
 
@@ -379,6 +401,18 @@ export async function POST(request: Request) {
               console.log(`[Gemini Cost Log] Added ₩${totalCost.toFixed(3)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}) to user ${userId}`);
             } catch (dbErr) {
               console.error("[Gemini Cost Log] Failed to update user cost:", dbErr);
+            }
+          }
+
+          // Save the assistant's answer in the background (non-blocking)
+          if (userId && fullText) {
+            try {
+              const { saveChatMessage } = await import("@/lib/firebase");
+              saveChatMessage(userId, "assistant", fullText).catch(err => {
+                console.error("[Firebase Log] Failed to save assistant message:", err);
+              });
+            } catch (importErr) {
+              console.error("[Firebase Log] Failed to import saveChatMessage:", importErr);
             }
           }
 
