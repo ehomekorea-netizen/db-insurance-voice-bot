@@ -161,14 +161,22 @@ export function VoiceCounselorApp() {
     const audioUrl = staticFiles[text.trim()];
 
     try {
-      let url: string;
+      let url = "";
       let isStatic = false;
 
       if (audioUrl) {
-        url = audioUrl;
-        isStatic = true;
-        console.log(`[VOICE] Playing pre-generated static audio for: "${text}"`);
-      } else {
+        // Verify if the static file actually exists on the server. If not, fallback to live TTS API.
+        const checkRes = await fetch(audioUrl, { method: "HEAD" }).catch(() => null);
+        if (checkRes && checkRes.ok) {
+          url = audioUrl;
+          isStatic = true;
+          console.log(`[VOICE] Playing pre-generated static audio for: "${text}"`);
+        } else {
+          console.warn(`[VOICE] Static audio file ${audioUrl} not found or inaccessible. Falling back to live TTS API.`);
+        }
+      }
+
+      if (!isStatic) {
         console.log(`[VOICE] Generating live TTS for: "${text}"`);
         const response = await fetch("/api/tts", {
           method: "POST",
