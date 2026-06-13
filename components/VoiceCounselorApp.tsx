@@ -216,6 +216,7 @@ export function VoiceCounselorApp() {
           }
           reject(e);
         };
+        audio.playbackRate = 1.15;
         audio.play().catch((err) => {
           activeAudioRef.current = null;
           setLiveTranscript("");
