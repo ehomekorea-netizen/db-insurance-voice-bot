@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      }, searchEnabled ? 6000 : 3000);
+      }, searchEnabled ? 12000 : 5000);
 
       if (!response.ok) {
         const errText = await response.text();
