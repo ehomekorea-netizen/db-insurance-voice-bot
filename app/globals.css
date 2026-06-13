@@ -68,12 +68,24 @@ body {
 
 /* Cover Screen / Entrance - Premium 3:4 Layout */
 .cover-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 100dvh;
   display: grid;
   place-items: center;
   background: radial-gradient(circle at 10% 20%, rgba(47, 118, 109, 0.08) 0%, rgba(247, 244, 234, 1) 90%);
   padding: 20px;
   overflow: hidden;
+  z-index: 9999;
+  transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+.cover-shell.fade-out {
+  opacity: 0;
+  transform: scale(1.05);
+  pointer-events: none;
 }
 
 .cover-card {
@@ -310,6 +322,19 @@ body {
   width: 100%;
 }
 
+.message-wrapper.card-wrapper {
+  max-width: 100% !important;
+  width: calc(100% + 24px) !important;
+  margin-left: -12px !important;
+  margin-right: -12px !important;
+  align-self: center;
+}
+
+.message-wrapper.card-wrapper .bubble-wrapper {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
 .message-wrapper.user-wrapper {
   align-self: flex-end;
   justify-content: flex-end;
@@ -486,12 +511,13 @@ body {
   border: 1px solid rgba(47, 118, 109, 0.12);
   border-top: 6px solid var(--accent-green);
   border-radius: 16px;
-  padding: 20px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 10px 30px -5px rgba(47, 118, 109, 0.08), 0 4px 6px -2px rgba(47, 118, 109, 0.04);
   max-width: 100%;
+  width: 100%;
 }
 
 .card-top {
@@ -563,7 +589,7 @@ body {
 }
 
 .section-title {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -595,7 +621,7 @@ body {
 }
 
 .summary-text {
-  font-size: 14px;
+  font-size: 15.5px;
   color: #0f172a;
   line-height: 1.65;
   background: linear-gradient(135deg, #fffef9, #fffbeb);
@@ -607,9 +633,9 @@ body {
 }
 
 .analysis-text {
-  font-size: 12.5px;
+  font-size: 14px;
   color: #334155;
-  line-height: 1.6;
+  line-height: 1.65;
   background: #f8fafc;
   border-left: 3px solid #2563eb;
   padding: 10px 12px;
@@ -626,9 +652,9 @@ body {
 .bullet-list li {
   position: relative;
   padding-left: 14px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: #334155;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 .bullet-list li::before {
   content: "";
@@ -858,9 +884,21 @@ body {
   .message-wrapper {
     max-width: 90%;
   }
+  
+  .message-wrapper.card-wrapper {
+    max-width: 100% !important;
+    width: calc(100% + 16px) !important;
+    margin-left: -8px !important;
+    margin-right: -8px !important;
+  }
+  
+  .message-wrapper.card-wrapper .bubble-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
 
   .answer-card {
-    padding: 10px;
+    padding: 12px 8px;
     box-shadow: 2px 2px 0px rgba(32, 52, 58, 0.15);
   }
   
@@ -1107,7 +1145,7 @@ body {
 }
 
 .citation-title-text {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 650;
   color: #334155;
   overflow: hidden;
@@ -1174,4 +1212,66 @@ body {
 .bullet-list li {
   word-break: break-all;
   overflow-wrap: break-word;
+}
+
+/* Zoomed/Enlarged text size adjustments inside RAG Answer Card */
+.answer-card.large-font .summary-text {
+  font-size: 19.5px !important;
+  line-height: 1.65 !important;
+}
+
+.answer-card.large-font .analysis-text {
+  font-size: 17.5px !important;
+  line-height: 1.65 !important;
+}
+
+.answer-card.large-font .bullet-list li {
+  font-size: 17.5px !important;
+  line-height: 1.6 !important;
+}
+
+.answer-card.large-font .section-title {
+  font-size: 18.5px !important;
+}
+
+.answer-card.large-font .card-category-tag {
+  font-size: 13.5px !important;
+}
+
+.answer-card.large-font .card-logo-badge {
+  font-size: 12px !important;
+}
+
+.answer-card.large-font .citation-title-text {
+  font-size: 18px !important;
+}
+
+.answer-card.large-font .citation-badge {
+  font-size: 14px !important;
+}
+
+/* zoom-toggle-btn Premium styling */
+.zoom-toggle-btn {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #2563eb;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.zoom-toggle-btn:hover {
+  background: #f1f5f9;
+  color: #1d4ed8;
+  border-color: #cbd5e1;
+}
+
+.zoom-toggle-btn:active {
+  transform: scale(0.95);
 }

@@ -77,9 +77,28 @@ function generateUUID(): string {
     return v.toString(16);
   });
 }
-
 export function VoiceCounselorApp() {
   const [hasStartedConsultation, setHasStartedConsultation] = useState(false);
+  const [showCover, setShowCover] = useState(true);
+  const [fadeCover, setFadeCover] = useState(false);
+
+  // Cover Screen Auto-Transition UX
+  useEffect(() => {
+    const fadeTimeout = setTimeout(() => {
+      setFadeCover(true);
+    }, 2500);
+
+    const removeTimeout = setTimeout(() => {
+      setShowCover(false);
+      setHasStartedConsultation(true);
+    }, 3000);
+
+    return () => {
+      clearTimeout(fadeTimeout);
+      clearTimeout(removeTimeout);
+    };
+  }, []);
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,16 +123,61 @@ export function VoiceCounselorApp() {
   const isMicMutedRef = useRef(isMicMuted);
   isMicMutedRef.current = isMicMuted;
 
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "system",
-      content:
-        "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("db_insurance_chat_history");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to load chat history:", e);
+      }
     }
-  ]);
+    setMessages([
+      {
+        id: "welcome",
+        role: "system",
+        content:
+          "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+      }
+    ]);
+  }, []);
+
+  // Save chat history to localStorage with FIFO queue (limit 100 messages)
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    if (messages.length > 100) {
+      setMessages(messages.slice(-100));
+      return;
+    }
+
+    try {
+      localStorage.setItem("db_insurance_chat_history", JSON.stringify(messages));
+    } catch (e) {
+      console.error("Failed to save chat history to localStorage:", e);
+    }
+  }, [messages]);
+
+  function clearChatHistory() {
+    if (window.confirm("기존 대화 내역을 모두 삭제하시겠습니까?")) {
+      localStorage.removeItem("db_insurance_chat_history");
+      setMessages([
+        {
+          id: "welcome",
+          role: "system",
+          content:
+            "반갑습니다. DB손해보험 동목포 부지점장 프로미입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+        }
+      ]);
+    }
+  }
 
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const reusableAudioRef = useRef<HTMLAudioElement | null>(null); // Reusable unlocked audio node for Safari/iOS compatibility
@@ -1124,29 +1188,23 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
     });
   }
 
-  // Cover Screen / Entrance - Revamped and brand aligned
-  if (!hasStartedConsultation) {
-    return (
-      <main className="cover-shell">
-        <div className="cover-card">
-          <div className="promy-avatar-lg">
-            <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
-          </div>
-          <h1 className="cover-title">동목포 오멘토</h1>
-          <p className="cover-description">
-            동목포 PA님들의 영업을 지원하는 멘토
-          </p>
-          <button className="primary-button start-consult-btn" onClick={handleStartButtonClick}>
-            상담 시작하기 <span className="btn-arrow">➔</span>
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  // Main Unified Messenger UI
   return (
-    <main className="messenger-shell">
+    <>
+      {showCover && (
+        <main className={`cover-shell ${fadeCover ? "fade-out" : ""}`}>
+          <div className="cover-card">
+            <div className="promy-avatar-lg">
+              <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
+            </div>
+            <h1 className="cover-title">동목포 오멘토</h1>
+            <p className="cover-description">
+              동목포 PA님들의 영업을 지원하는 멘토
+            </p>
+          </div>
+        </main>
+      )}
+
+      <main className="messenger-shell">
       {/* Header */}
       <header className="messenger-header">
         <div className="messenger-brand">
@@ -1165,7 +1223,28 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             </div>
           </div>
         </div>
-        <div className="messenger-header-actions">
+        <div className="messenger-header-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {messages.length > 1 && (
+            <button className="clear-chat-btn" onClick={clearChatHistory} title="대화 기록 전체 삭제" style={{
+              background: "transparent",
+              border: "none",
+              color: "#94a3b8",
+              cursor: "pointer",
+              padding: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "50%",
+              transition: "background-color 0.2s"
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          )}
           {!isConnected && !isConnecting ? (
             <button className="primary-button help-request-btn" onClick={startRealtime}>
               도움요청 🎙️
@@ -1181,21 +1260,24 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Messages */}
       <section className="messenger-chat-area">
         {messages.map((message) => {
+          const isCard = message.role === "assistant" && message.answer;
           const wrapperClass =
             message.role === "user"
               ? "user-wrapper"
               : message.role === "system"
               ? "system-wrapper"
+              : isCard
+              ? "card-wrapper"
               : "assistant-wrapper";
           return (
             <div key={message.id} className={`message-wrapper ${wrapperClass}`}>
-              {message.role === "assistant" && (
+              {message.role === "assistant" && !isCard && (
                 <div className="avatar-wrapper">
                   <img src="/promy.png" alt="PROMY" className="avatar-img" />
                 </div>
               )}
               <div className="bubble-wrapper">
-                {message.role === "assistant" && <span className="sender-name">프로미</span>}
+                {message.role === "assistant" && !isCard && <span className="sender-name">프로미</span>}
                 {message.role === "user" && <span className="sender-name">나</span>}
                 <MessageBubble
                   message={message}
@@ -1269,6 +1351,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         <div ref={messagesEndRef} />
       </section>
     </main>
+  </>
   );
 }
 
@@ -1346,6 +1429,7 @@ function MessageBubble({
   onCopy: (ans: PolicyAnswer) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   if (message.role === "assistant" && !message.answer) {
     return (
@@ -1359,23 +1443,41 @@ function MessageBubble({
     const ans = message.answer;
     const isCopied = copiedId === message.id;
     return (
-      <article className="message assistant answer-card">
+      <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
           <div className="card-top-left">
             <span className="card-logo-badge">DB손보</span>
             <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Google (Serper)"})</span>
           </div>
-          <button className="copy-action-btn" onClick={() => onCopy(ans)}>
-            {isCopied ? "복사 완료! ✔" : (
-              <>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                복사
-              </>
-            )}
-          </button>
+          <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소" style={{
+              fontSize: "10px",
+              fontWeight: "700",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              padding: "4px 8px",
+              cursor: "pointer",
+              color: "#2563eb",
+              transition: "all 0.2s ease",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "2px"
+            }}>
+              {isZoomed ? "글씨 🔍-" : "글씨 🔍+"}
+            </button>
+            <button className="copy-action-btn" onClick={() => onCopy(ans)}>
+              {isCopied ? "복사 완료! ✔" : (
+                <>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  복사
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 질문 이해 및 분석 근거 (최상단 아코디언 배치) */}
