@@ -82,8 +82,57 @@ export function VoiceCounselorApp() {
   const [showCover, setShowCover] = useState(true);
   const [fadeCover, setFadeCover] = useState(false);
 
-  // Cover Screen Auto-Transition UX
-  useEffect(() => {
+  // Kakao Auth States
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [kakaoUser, setKakaoUser] = useState<{ id: number; nickname: string; profileImage: string } | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // 카카오 로그인 콜백 처리
+  const handleKakaoCallback = async (code: string) => {
+    setIsAuthLoading(true);
+    setError(null);
+    try {
+      const redirectUri = window.location.origin;
+      const res = await fetch("/api/auth/kakao/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, redirect_uri: redirectUri })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "카카오 로그인 연동에 실패했습니다.");
+      }
+
+      const data = await res.json();
+      if (data.success && data.user) {
+        localStorage.setItem("kakao_user", JSON.stringify(data.user));
+        setKakaoUser(data.user);
+        setIsLoggedIn(true);
+        
+        // URL에서 code 파라미터 정제
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // 2단계 오프닝 애니메이션 구동
+        startOpeningAnimation();
+      } else {
+        throw new Error("카카오 로그인 인증 후 사용자 정보를 받아오지 못했습니다.");
+      }
+    } catch (err: any) {
+      console.error("[KAKAO LOGIN ERROR]", err);
+      setError(err.message || "카카오 로그인 인증 처리 중 에러가 발생했습니다.");
+      setIsLoggedIn(false);
+      setShowCover(true);
+      setFadeCover(false);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const startOpeningAnimation = () => {
+    setShowCover(true);
+    setFadeCover(false);
+
     const fadeTimeout = setTimeout(() => {
       setFadeCover(true);
     }, 2500);
@@ -97,9 +146,56 @@ export function VoiceCounselorApp() {
       clearTimeout(fadeTimeout);
       clearTimeout(removeTimeout);
     };
+  };
+
+  // 초기 로그인 유무 및 Callback 감지
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+
+    if (code) {
+      handleKakaoCallback(code);
+    } else {
+      const savedUser = localStorage.getItem("kakao_user");
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          setKakaoUser(parsed);
+          setIsLoggedIn(true);
+          // 로그인 세션이 있으므로 바로 2단계 오프닝 재생
+          startOpeningAnimation();
+        } catch (e) {
+          localStorage.removeItem("kakao_user");
+          setIsLoggedIn(false);
+          setIsAuthLoading(false);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setIsAuthLoading(false);
+      }
+    }
   }, []);
 
+  const handleKakaoLogin = () => {
+    if (isAuthLoading) return;
+    setIsAuthLoading(true);
+    window.location.href = "/api/auth/kakao/login";
+  };
+
+  const handleLogout = () => {
+    if (window.confirm("로그아웃 하시겠습니까?")) {
+      localStorage.removeItem("kakao_user");
+      setKakaoUser(null);
+      setIsLoggedIn(false);
+      
+      // 1단계 카카오 로그인 대기 상태로 원복
+      setShowCover(true);
+      setFadeCover(false);
+    }
+  };
+
   const [isConnecting, setIsConnecting] = useState(false);
+
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -1238,6 +1334,24 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             <p className="cover-description">
               동목포 PA님들의 영업을 지원하는 멘토
             </p>
+            {!isLoggedIn && (
+              <button 
+                className={`kakao-login-btn ${isAuthLoading ? "kakao-login-btn-loading" : ""}`}
+                onClick={handleKakaoLogin}
+                disabled={isAuthLoading}
+              >
+                {isAuthLoading ? (
+                  <span>연동 처리 중...</span>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 3C6.48 3 2 6.48 2 10.75c0 2.92 2.11 5.48 5.25 6.78l-1.04 3.86a.4.4 0 0 0 .58.43l4.52-2.51c.56.09 1.12.14 1.69.14 5.52 0 10-3.48 10-7.75S17.52 3 12 3z"/>
+                    </svg>
+                    <span>카카오 로그인</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </main>
       )}
@@ -1248,7 +1362,21 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         <div className="messenger-brand">
           <img src="/promy.png" alt="PROMY" className="avatar-img" />
           <div>
-            <h2>동목포 오멘토</h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <h2>동목포 오멘토</h2>
+              {kakaoUser && (
+                <div className="user-badge" title={`${kakaoUser.nickname}님 로그인됨`}>
+                  {kakaoUser.profileImage ? (
+                    <img src={kakaoUser.profileImage} alt="" />
+                  ) : (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#191919" }}>
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
+                  )}
+                  <span>{kakaoUser.nickname}님</span>
+                </div>
+              )}
+            </div>
             <div className="messenger-status-row">
               <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
                 {isConnected && isMicMuted ? "🎙️ 프로미 답변 중 (음소거)" : statusLabel}
@@ -1262,6 +1390,15 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           </div>
         </div>
         <div className="messenger-header-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {isLoggedIn && (
+            <button className="logout-btn" onClick={handleLogout} title="로그아웃">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          )}
           {messages.length > 1 && (
             <button className="clear-chat-btn" onClick={clearChatHistory} title="대화 기록 전체 삭제" style={{
               background: "transparent",

@@ -1373,3 +1373,92 @@ body {
   pointer-events: none !important;
   user-select: none !important;
 }
+
+/* Kakao Login Button Styling */
+.kakao-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: #FEE500;
+  color: #191919;
+  border: none;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 320px;
+  height: 52px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(254, 229, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 25px;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.kakao-login-btn:hover {
+  background-color: #FADA0A;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(254, 229, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.kakao-login-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 4px rgba(254, 229, 0, 0.2);
+}
+
+.kakao-login-btn-loading {
+  background-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.kakao-login-btn-loading:hover {
+  background-color: #e2e8f0;
+  transform: none;
+  box-shadow: none;
+}
+
+/* User Badge & Logout Button in Header */
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(254, 229, 0, 0.15);
+  border: 1px solid rgba(254, 229, 0, 0.3);
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-ink);
+  transition: all 0.2s ease;
+}
+
+.user-badge img {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.logout-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+  background-color: rgba(32, 52, 58, 0.05);
+  color: var(--accent-coral);
+}
+
