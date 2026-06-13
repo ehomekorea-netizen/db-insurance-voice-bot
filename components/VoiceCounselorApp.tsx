@@ -247,25 +247,36 @@ export function VoiceCounselorApp() {
       activeAudioRef.current = audio;
 
       await new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
+        const safetyTimeout = setTimeout(() => {
+          console.warn("[VOICE] playStaticAudio safety timeout reached. Forcing resolution.");
+          cleanup();
+          resolve();
+        }, 10000);
+
+        function cleanup() {
+          clearTimeout(safetyTimeout);
+          if (reusableAudioRef.current) {
+            reusableAudioRef.current.onended = null;
+            reusableAudioRef.current.onerror = null;
+          }
           activeAudioRef.current = null;
           setLiveTranscript("");
           isPlayingAudio.current = false;
+        }
+
+        audio.onended = () => {
+          cleanup();
           resetInactivityTimer();
           resolve();
         };
         audio.onerror = (e) => {
-          activeAudioRef.current = null;
-          setLiveTranscript("");
-          isPlayingAudio.current = false;
+          cleanup();
           resetInactivityTimer();
           reject(e);
         };
         audio.playbackRate = 1.15;
         audio.play().catch((err) => {
-          activeAudioRef.current = null;
-          setLiveTranscript("");
-          isPlayingAudio.current = false;
+          cleanup();
           resetInactivityTimer();
           reject(err);
         });
@@ -327,8 +338,8 @@ export function VoiceCounselorApp() {
       const rms = Math.sqrt(sum / bufferLength);
       const now = Date.now();
 
-      // Slowly adapt noise floor when not speaking to handle ambient room noise
-      if (!hasSpokenRef.current) {
+      // Slowly adapt noise floor when not recording to handle ambient room noise
+      if (!isRecordingRef.current) {
         noiseFloorRef.current = noiseFloorRef.current * 0.95 + rms * 0.05;
       }
 
