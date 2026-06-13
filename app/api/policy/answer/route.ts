@@ -40,13 +40,15 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 // Local database chunks lookup helper removed per client request to focus 100% on search grounding.
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest;
+  const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest & { userId?: string };
   let question = body.question?.trim();
   const productHint = body.product_hint?.trim();
+  const userId = body.userId?.trim();
 
   if (!question) {
     return NextResponse.json({ error: "question is required" }, { status: 400 });
   }
+
 
   // Apply Korean Jamo Fuzzy Corrector to clean up STT typos
   const originalQuestion = question;
@@ -172,6 +174,9 @@ export async function POST(request: Request) {
       return response.body.getReader();
     }
 
+    let promptTokenCount = 0;
+    let candidatesTokenCount = 0;
+
     const customStream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -238,6 +243,11 @@ export async function POST(request: Request) {
                     const meta = obj.candidates?.[0]?.groundingMetadata;
                     if (meta) {
                       groundingMetadata = { ...groundingMetadata, ...meta };
+                    }
+                    const usage = obj.usageMetadata;
+                    if (usage) {
+                      promptTokenCount = usage.promptTokenCount || promptTokenCount;
+                      candidatesTokenCount = usage.candidatesTokenCount || candidatesTokenCount;
                     }
                   } catch (e) {
                     console.error("[Gemini Stream] JSON Parse error for chunk:", e);
@@ -356,6 +366,21 @@ export async function POST(request: Request) {
               "해당 상품이 판매상품인지 판매중지 상품인지 여부"
             ]
           });
+
+          // Accumulate Gemini Cost (USD/KRW converted with rate 1,400₩/$1)
+          if (userId && (promptTokenCount > 0 || candidatesTokenCount > 0)) {
+            const inputCost = promptTokenCount * 0.000105; // $0.075 / 1M tokens * 1400₩
+            const outputCost = candidatesTokenCount * 0.00042; // $0.30 / 1M tokens * 1400₩
+            const totalCost = inputCost + outputCost;
+            try {
+              // Dynamic import to prevent initialisation timing race conditions in Edge Runtime
+              const { incrementUserCost } = await import("@/lib/firebase");
+              await incrementUserCost(userId, "gemini", totalCost);
+              console.log(`[Gemini Cost Log] Added ₩${totalCost.toFixed(3)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}) to user ${userId}`);
+            } catch (dbErr) {
+              console.error("[Gemini Cost Log] Failed to update user cost:", dbErr);
+            }
+          }
 
           controller.enqueue(encoder.encode(`event: done\ndata: {}\n\n`));
 

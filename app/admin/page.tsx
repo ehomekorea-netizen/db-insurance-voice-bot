@@ -8,6 +8,8 @@ interface UserRecord {
   profileImage: string;
   status: "approved" | "blocked";
   updatedAt: string;
+  geminiCost?: number;
+  whisperCost?: number;
 }
 
 export default function AdminPage() {
@@ -224,6 +226,9 @@ export default function AdminPage() {
                     <th>프로필</th>
                     <th>닉네임</th>
                     <th>카카오 ID</th>
+                    <th>Gemini 비용</th>
+                    <th>Whisper 비용</th>
+                    <th>총 비용</th>
                     <th>최종 활동 시각</th>
                     <th>상태</th>
                     <th>작업</th>
@@ -235,14 +240,25 @@ export default function AdminPage() {
                       <td>
                         <div className="admin-table-avatar">
                           {user.profileImage ? (
-                            <img src={user.profileImage} alt="" />
+                            <img src={user.profileImage} alt={user.nickname} />
                           ) : (
-                            <div className="admin-avatar-placeholder">PA</div>
+                            <div className="admin-avatar-placeholder">
+                              {user.nickname ? user.nickname.slice(0, 2) : "PA"}
+                            </div>
                           )}
                         </div>
                       </td>
                       <td className="font-bold">{user.nickname}</td>
                       <td className="text-gray">{user.id}</td>
+                      <td>
+                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </td>
+                      <td>
+                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </td>
+                      <td style={{ fontWeight: "700" }}>
+                        ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </td>
                       <td className="text-gray">{formatDate(user.updatedAt)}</td>
                       <td>
                         <span className={`status-badge ${user.status}`}>

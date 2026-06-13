@@ -4,6 +4,8 @@ export interface FirestoreUser {
   profileImage: string;
   status: "approved" | "blocked";
   updatedAt: string;
+  geminiCost: number;
+  whisperCost: number;
 }
 
 const getBaseUrl = () => {
@@ -41,25 +43,31 @@ export async function getUser(kakaoId: string): Promise<FirestoreUser | null> {
   }
 }
 
-// 사용자 생성 및 프로필 업데이트 (기존 status 보존)
+// 사용자 생성 및 프로필 업데이트 (기존 status 및 cost 보존)
 export async function upsertUser(
   kakaoId: string,
   nickname: string,
   profileImage: string,
-  status?: "approved" | "blocked"
+  status?: "approved" | "blocked",
+  geminiCost?: number,
+  whisperCost?: number
 ): Promise<FirestoreUser | null> {
   const baseUrl = getBaseUrl();
   if (!baseUrl) return null;
 
   try {
-    // Preserve existing status if not explicitly passed
+    // Preserve existing fields if not explicitly passed
     const existing = await getUser(kakaoId);
     const finalStatus = status || existing?.status || "approved";
+    const finalGeminiCost = geminiCost !== undefined ? geminiCost : (existing?.geminiCost || 0);
+    const finalWhisperCost = whisperCost !== undefined ? whisperCost : (existing?.whisperCost || 0);
 
     const fields: any = {
       nickname: { stringValue: nickname },
       profileImage: { stringValue: profileImage },
       status: { stringValue: finalStatus },
+      geminiCost: { doubleValue: finalGeminiCost },
+      whisperCost: { doubleValue: finalWhisperCost },
       updatedAt: { stringValue: new Date().toISOString() }
     };
 
@@ -79,6 +87,58 @@ export async function upsertUser(
     return parseFirestoreDoc(doc);
   } catch (err) {
     console.error(`[FIREBASE] upsertUser error for ID ${kakaoId}:`, err);
+    return null;
+  }
+}
+
+// 사용자 누적 비용 증가 유틸리티
+export async function incrementUserCost(
+  kakaoId: string,
+  type: "gemini" | "whisper",
+  amount: number
+): Promise<FirestoreUser | null> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return null;
+
+  try {
+    const existing = await getUser(kakaoId);
+    if (!existing) {
+      console.warn(`[FIREBASE] Cannot increment cost. User ${kakaoId} not found.`);
+      return null;
+    }
+
+    let geminiCost = existing.geminiCost || 0;
+    let whisperCost = existing.whisperCost || 0;
+
+    if (type === "gemini") {
+      geminiCost += amount;
+    } else if (type === "whisper") {
+      whisperCost += amount;
+    }
+
+    const fields: any = {
+      nickname: { stringValue: existing.nickname },
+      profileImage: { stringValue: existing.profileImage },
+      status: { stringValue: existing.status },
+      geminiCost: { doubleValue: geminiCost },
+      whisperCost: { doubleValue: whisperCost },
+      updatedAt: { stringValue: new Date().toISOString() }
+    };
+
+    const res = await fetch(`${baseUrl}/users/${kakaoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Firestore PATCH increment error: ${res.status}`);
+    }
+
+    const doc = await res.json();
+    return parseFirestoreDoc(doc);
+  } catch (err) {
+    console.error(`[FIREBASE] incrementUserCost error for ID ${kakaoId}:`, err);
     return null;
   }
 }
@@ -123,11 +183,22 @@ function parseFirestoreDoc(doc: any): FirestoreUser | null {
   const id = nameParts[nameParts.length - 1];
 
   const fields = doc.fields;
+  
+  // doubleValue 혹은 integerValue 모두 지원하도록 파싱
+  const parseCost = (val: any) => {
+    if (!val) return 0;
+    if (val.doubleValue !== undefined) return Number(val.doubleValue);
+    if (val.integerValue !== undefined) return Number(val.integerValue);
+    return 0;
+  };
+
   return {
     id,
     nickname: fields.nickname?.stringValue || "",
     profileImage: fields.profileImage?.stringValue || "",
     status: (fields.status?.stringValue || "approved") as "approved" | "blocked",
-    updatedAt: fields.updatedAt?.stringValue || new Date().toISOString()
+    updatedAt: fields.updatedAt?.stringValue || new Date().toISOString(),
+    geminiCost: parseCost(fields.geminiCost),
+    whisperCost: parseCost(fields.whisperCost)
   };
 }

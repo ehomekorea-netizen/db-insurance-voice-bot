@@ -87,6 +87,24 @@ export function VoiceCounselorApp() {
   const [kakaoUser, setKakaoUser] = useState<{ id: number; nickname: string; profileImage: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
+  // Easter Egg to Admin Page
+  const [logoClicks, setLogoClicks] = useState(0);
+  const lastClickTimeRef = useRef(0);
+
+  const handleLogoClick = () => {
+    const now = Date.now();
+    if (now - lastClickTimeRef.current > 3000) {
+      setLogoClicks(1);
+    } else {
+      const newClicks = logoClicks + 1;
+      setLogoClicks(newClicks);
+      if (newClicks >= 5) {
+        window.location.href = "/admin";
+      }
+    }
+    lastClickTimeRef.current = now;
+  };
+
   // 카카오 로그인 콜백 처리
   const handleKakaoCallback = async (code: string) => {
     setIsAuthLoading(true);
@@ -716,6 +734,14 @@ export function VoiceCounselorApp() {
       const formData = new FormData();
       formData.append("file", blob, "audio.webm");
 
+      const durationMs = recordingStartTimeRef.current > 0 ? (Date.now() - recordingStartTimeRef.current) : 0;
+      const durationSec = Math.max(1, Math.round(durationMs / 1000));
+
+      formData.append("duration", durationSec.toString());
+      if (kakaoUser) {
+        formData.append("userId", String(kakaoUser.id));
+      }
+
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData
@@ -1036,7 +1062,8 @@ export function VoiceCounselorApp() {
         body: JSON.stringify({
           question,
           intent,
-          product_hint: productHint
+          product_hint: productHint,
+          userId: kakaoUser ? String(kakaoUser.id) : undefined
         }),
         signal: controller.signal
       });
@@ -1327,7 +1354,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {showCover && (
         <main className={`cover-shell ${fadeCover ? "fade-out" : ""}`}>
           <div className="cover-card">
-            <div className="promy-avatar-lg">
+            <div className="promy-avatar-lg" onClick={handleLogoClick} style={{ cursor: "pointer" }}>
               <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
             </div>
             <h1 className="cover-title">동목포 오멘토</h1>
@@ -1377,7 +1404,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Header */}
       <header className="messenger-header">
         <div className="messenger-brand">
-          <img src="/promy.png" alt="PROMY" className="avatar-img" />
+          <img src="/promy.png" alt="PROMY" className="avatar-img" onClick={handleLogoClick} style={{ cursor: "pointer" }} />
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <h2>동목포 오멘토</h2>
@@ -1470,7 +1497,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               )}
               <div className="bubble-wrapper">
                 {message.role === "assistant" && !isCard && <span className="sender-name">프로미</span>}
-                {message.role === "user" && <span className="sender-name">나</span>}
+                {message.role === "user" && <span className="sender-name">{kakaoUser?.nickname || "나"}</span>}
                 <MessageBubble
                   message={message}
                   onShare={(ans) => handleShareText(ans)}
@@ -1478,7 +1505,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               </div>
               {message.role === "user" && (
                 <div className="avatar-wrapper">
-                  <div className="user-avatar-circle">PA</div>
+                  {kakaoUser && kakaoUser.profileImage ? (
+                    <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
+                  ) : (
+                    <div className="user-avatar-circle">
+                      {kakaoUser ? kakaoUser.nickname.slice(0, 2) : "PA"}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1489,7 +1522,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         {userLiveTranscript && (
           <div className="message-wrapper user-wrapper">
             <div className="bubble-wrapper">
-              <span className="sender-name">나 (말하는 중)</span>
+              <span className="sender-name">{kakaoUser?.nickname || "나"} (말하는 중)</span>
               <div className="message user-bubble live-typing-bubble">
                 <div className="live-transcript-header">
                   <span className="live-transcript-tag">🎙️ 음성 인식 중</span>
@@ -1504,7 +1537,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               </div>
             </div>
             <div className="avatar-wrapper">
-              <div className="user-avatar-circle">PA</div>
+              {kakaoUser && kakaoUser.profileImage ? (
+                <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
+              ) : (
+                <div className="user-avatar-circle">
+                  {kakaoUser ? kakaoUser.nickname.slice(0, 2) : "PA"}
+                </div>
+              )}
             </div>
           </div>
         )}
