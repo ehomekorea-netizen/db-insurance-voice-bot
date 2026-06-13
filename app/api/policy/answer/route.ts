@@ -145,7 +145,7 @@ export async function POST(request: Request) {
       }
     };
 
-    let modelName = "gemini-2.5-flash";
+    let modelName = "gemini-3.1-flash-lite";
     let usedSearch = useWebSearch;
 
     async function getGeminiStreamReader(model: string, searchEnabled: boolean) {
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
           reader = await getGeminiStreamReader(modelName, usedSearch);
         } catch (err: any) {
           console.warn(`[Gemini API Warning] ${modelName} with search grounding failed or timed out:`, err.message || err);
-          modelName = "gemini-2.5-flash";
+          modelName = "gemini-3.1-flash-lite";
           usedSearch = false;
           try {
             reader = await getGeminiStreamReader(modelName, usedSearch);
@@ -340,9 +340,9 @@ export async function POST(request: Request) {
           const cleanResponseText = fullText.replace(citationRegex, "").trim();
           const isSimpleChat = cleanResponseText.length < 250 && !cleanResponseText.includes("[분석 배경 및 이해]") && !cleanResponseText.includes("[조건]");
 
-          const usedEngine = modelName === "gemini-2.5-flash"
-            ? (usedSearch ? "실시간 검색 답변(Gemini 2.5 flash)" : "빠른 답변(Gemini 2.5 flash - 실시간 검색 시간초과)")
-            : (usedSearch ? "실시간 검색 답변(Gemini 2.0-flash는 폐기됨)" : "빠른 답변(Gemini 2.0-flash는 폐기됨)");
+          const usedEngine = modelName === "gemini-3.1-flash-lite"
+            ? (usedSearch ? "실시간 검색 답변(Gemini 3.1 Flash-Lite)" : "빠른 답변(Gemini 3.1 Flash-Lite - 실시간 검색 시간초과)")
+            : (usedSearch ? "실시간 검색 답변(Gemini 2.5 flash)" : "빠른 답변(Gemini 2.5 flash - 실시간 검색 시간초과)");
 
           writeMetadata({
             isSimpleChat,
