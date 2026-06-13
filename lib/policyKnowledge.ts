@@ -38,6 +38,7 @@ export type PolicyAnswer = {
   }>;
   disclaimer: string;
   searchEngine?: string;
+  modelName?: string;
 };
 
 export const samplePolicyChunks: PolicyChunk[] = [

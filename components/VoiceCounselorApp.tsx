@@ -1026,6 +1026,7 @@ export function VoiceCounselorApp() {
                           requiredInfo: metadata?.requiredInfo || [],
                           citations: metadata?.citations || [],
                           searchEngine: metadata?.searchEngine || "실시간 스트리밍",
+                          modelName: metadata?.modelName || "Gemini 3.1 Flash-Lite",
                           disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
                         }
                       }
@@ -1072,6 +1073,7 @@ export function VoiceCounselorApp() {
         requiredInfo: metadata?.requiredInfo || [],
         citations: metadata?.citations || [],
         searchEngine: metadata?.searchEngine || "실시간 스트리밍",
+        modelName: metadata?.modelName || "Gemini 3.1 Flash-Lite",
         isSimpleChat: metadata?.isSimpleChat || false,
         disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
       } as PolicyAnswer & { isSimpleChat?: boolean };
@@ -1485,7 +1487,7 @@ function MessageBubble({
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
           <div className="card-top-left">
-            <span className="card-category-tag">공식 약관 RAG 리포트 ({ans.searchEngine || "Google (Serper)"})</span>
+            <span className="card-category-tag">모델: {ans.modelName || "Gemini 3.1 Flash-Lite"}</span>
           </div>
           <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
@@ -1510,7 +1512,7 @@ function MessageBubble({
             }}>
               {isZoomed ? "글씨 🔍-" : "글씨 🔍+"}
             </button>
-            <button className="copy-action-btn" onClick={() => onCopy(ans)}>
+            <button className={`copy-action-btn ${isCopied ? "copied-success" : ""}`} onClick={() => onCopy(ans)}>
               {isCopied ? "복사 완료! ✔" : (
                 <>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>

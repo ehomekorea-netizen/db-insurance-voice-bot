@@ -78,6 +78,7 @@ export async function POST(request: Request) {
       productHint: body.product_hint
     });
     fallbackAnswer.searchEngine = "로컬 MVP 샘플 데이터";
+    fallbackAnswer.modelName = "Gemini 3.1 Flash-Lite";
     return NextResponse.json(fallbackAnswer);
   }
 
@@ -347,6 +348,7 @@ export async function POST(request: Request) {
           writeMetadata({
             isSimpleChat,
             searchEngine: usedEngine,
+            modelName: modelName === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash-Lite" : "Gemini 2.5 Flash",
             citations,
             requiredInfo: [
               "정확한 상품 명칭 및 약관 개정 버전",
