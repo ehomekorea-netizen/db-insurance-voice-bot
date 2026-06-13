@@ -11,6 +11,22 @@ type PolicyAnswerRequest = {
   product_hint?: string;
 };
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
 // Local database chunks lookup helper removed per client request to focus 100% on search grounding.
 
 export async function POST(request: Request) {
@@ -120,32 +136,54 @@ export async function POST(request: Request) {
     };
 
     let modelName = "gemini-2.5-flash";
-    let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody)
-      }
-    );
+    let response: Response;
+    let usedSearch = useWebSearch;
 
-    // 503 Unavailable (High Demand) 또는 기타 API 에러 발생 시, 검증된 gemini-2.0-flash로 자동 폴백 재시도
-    if (response.status === 503 || !response.ok) {
-      console.warn(`[Gemini API Warning] ${modelName} 호출 실패(HTTP ${response.status}). 안정화된 gemini-2.0-flash로 즉시 우회 재시도합니다.`);
-      modelName = "gemini-2.0-flash";
-      response = await fetch(
+    try {
+      console.log(`[Gemini API] Calling ${modelName} with search grounding (timeout 6.5s)...`);
+      response = await fetchWithTimeout(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody)
-        }
+        },
+        6500
       );
-    }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API HTTP ${response.status} (Model: ${modelName}): ${errText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP status ${response.status}`);
+      }
+    } catch (err: any) {
+      console.warn(`[Gemini API Warning] ${modelName} with search grounding failed or timed out:`, err.message || err);
+      // Fallback to gemini-2.0-flash without search grounding for high speed and avoiding Vercel timeouts
+      modelName = "gemini-2.0-flash";
+      usedSearch = false;
+      console.log(`[Gemini API Fallback] Calling ${modelName} WITHOUT search grounding (timeout 2.5s)...`);
+      const fallbackBody = {
+        ...requestBody,
+        tools: undefined
+      };
+      
+      try {
+        response = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fallbackBody)
+          },
+          2500
+        );
+      } catch (fallbackErr: any) {
+        console.error(`[Gemini API Critical] Fallback model ${modelName} also failed or timed out:`, fallbackErr.message || fallbackErr);
+        throw new Error(`답변 생성 엔진 호출 실패: ${fallbackErr.message || fallbackErr}`);
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Gemini API HTTP ${response.status} (Model: ${modelName}): ${errText}`);
+      }
     }
 
     const data = await response.json();
@@ -284,8 +322,8 @@ export async function POST(request: Request) {
     }
 
     const usedEngine = modelName === "gemini-2.5-flash"
-      ? "실시간 검색 답변(Gemini 2.5 flash)"
-      : "실시간 검색 답변(Gemini 2.0 flash)";
+      ? (usedSearch ? "실시간 검색 답변(Gemini 2.5 flash)" : "빠른 답변(Gemini 2.5 flash)")
+      : (usedSearch ? "실시간 검색 답변(Gemini 2.0 flash)" : "빠른 답변(Gemini 2.0 flash - 실시간 검색 시간초과)");
 
     return NextResponse.json({
       id: crypto.randomUUID(),

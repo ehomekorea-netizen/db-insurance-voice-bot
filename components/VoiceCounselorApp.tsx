@@ -685,43 +685,62 @@ export function VoiceCounselorApp() {
   }
 
   async function requestPolicyAnswer(question: string, intent?: PolicyIntent, productHint?: string) {
-    const response = await fetch("/api/policy/answer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        intent,
-        product_hint: productHint
-      })
-    });
-    const payload = (await response.json()) as (PolicyAnswer & { isSimpleChat?: boolean }) | { error?: string };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 11000); // 11s client-side timeout
 
-    if (!response.ok || !isPolicyAnswer(payload)) {
-      throw new Error("error" in payload && payload.error ? payload.error : "약관 답변 생성에 실패했습니다.");
+    try {
+      const response = await fetch("/api/policy/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          intent,
+          product_hint: productHint
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      let payload;
+      try {
+        payload = (await response.json()) as (PolicyAnswer & { isSimpleChat?: boolean }) | { error?: string };
+      } catch (jsonErr) {
+        throw new Error(`서버 응답 처리 중 에러가 발생했습니다 (HTTP ${response.status}).`);
+      }
+
+      if (!response.ok || !isPolicyAnswer(payload)) {
+        throw new Error("error" in payload && payload.error ? payload.error : "약관 답변 생성에 실패했습니다.");
+      }
+
+      const contentText = isConnected
+        ? `${payload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
+        : payload.summary;
+
+      const now = new Date();
+      const formattedTime = now.toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+
+      addMessage({
+        role: "assistant",
+        content: contentText,
+        answer: payload,
+        timestamp: formattedTime
+      });
+
+      return payload;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        throw new Error("답변 생성 시간이 초과되었습니다 (11초). 네트워크 상태를 확인하시거나 다시 시도해 주세요.");
+      }
+      throw err;
     }
-
-    const contentText = isConnected
-      ? `${payload.summary}\n\n*(음성 상담은 답변 전송 완료 후 자동으로 종료됩니다.)*`
-      : payload.summary;
-
-    const now = new Date();
-    const formattedTime = now.toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false
-    });
-
-    addMessage({
-      role: "assistant",
-      content: contentText,
-      answer: payload,
-      timestamp: formattedTime
-    });
-
-    return payload;
   }
 
   async function submitTextQuestion(event: FormEvent<HTMLFormElement>) {
