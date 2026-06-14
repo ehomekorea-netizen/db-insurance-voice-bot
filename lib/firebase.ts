@@ -286,12 +286,16 @@ export async function getUserChatLogs(userId: string): Promise<ChatLogEntry[]> {
         const id = nameParts[nameParts.length - 1];
         const fields = doc.fields;
         
+        const rawTimestamp = fields.timestamp?.stringValue;
+        const hasValidTimestamp = rawTimestamp && rawTimestamp !== "undefined" && rawTimestamp !== "null" && rawTimestamp.trim() !== "";
+        const timestamp = hasValidTimestamp ? rawTimestamp : (doc.createTime || new Date().toISOString());
+
         logs.push({
           id,
           userId: fields.userId?.stringValue || "",
           role: (fields.role?.stringValue || "user") as "user" | "assistant",
           content: fields.content?.stringValue || "",
-          timestamp: fields.timestamp?.stringValue || doc.createTime || new Date().toISOString()
+          timestamp
         });
       }
     }

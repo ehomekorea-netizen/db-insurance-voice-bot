@@ -239,6 +239,104 @@ export function VoiceCounselorApp() {
     }
   }, []);
 
+  // Fetch user chat logs from Firestore when logged in
+  useEffect(() => {
+    if (!isLoggedIn || !kakaoUser) return;
+
+    const userId = kakaoUser.id;
+    async function loadDbHistory() {
+      try {
+        const res = await fetch(`/api/policy/history?userId=${userId}`);
+        if (!res.ok) throw new Error("Failed to fetch history");
+        
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs) && data.logs.length > 0) {
+          const loadedMessages = data.logs.map((log: any, idx: number) => {
+            const isWelcome = log.content.includes("PA님 무엇을 도와드릴까요?");
+            const isSimpleChat = !log.content.includes("[요약]");
+
+            if (isWelcome) {
+              return {
+                id: log.id || generateUUID(),
+                role: "system", // Welcome message is system role in frontend
+                content: log.content,
+                timestamp: log.timestamp
+              };
+            }
+
+            if (log.role === "assistant" && !isSimpleChat) {
+              // Reconstruct user question from previous message
+              let question = "이전 질문";
+              if (idx > 0 && data.logs[idx - 1].role === "user") {
+                question = data.logs[idx - 1].content;
+              }
+
+              const parsed = parseStreamedText(log.content);
+              const answer = {
+                id: log.id,
+                question,
+                intent: "policy_explanation",
+                analysis: parsed.analysis,
+                summary: parsed.summary,
+                conditions: parsed.conditions,
+                cautions: parsed.cautions,
+                requiredInfo: [],
+                citations: [],
+                headline: getFallbackHeadline(question, parsed.summary),
+                searchEngine: "공시자료 검색",
+                modelName: "Gemini 3.1 Flash-Lite",
+                isSimpleChat: false,
+                disclaimer: "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+              };
+
+              return {
+                id: log.id,
+                role: "assistant",
+                content: log.content,
+                answer,
+                timestamp: log.timestamp
+              };
+            }
+
+            return {
+              id: log.id,
+              role: log.role,
+              content: log.content,
+              timestamp: log.timestamp
+            };
+          });
+
+          // Prepend welcome message if not present in loadedMessages
+          const hasWelcome = loadedMessages.some((m: any) => m.id === "welcome" || m.content.includes("PA님 무엇을 도와드릴까요?"));
+          if (!hasWelcome) {
+            const welcomeMsg = {
+              id: "welcome",
+              role: "system",
+              content: "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다.",
+              timestamp: loadedMessages[0]?.timestamp || new Date().toISOString()
+            };
+            setMessages([welcomeMsg as ChatMessage, ...loadedMessages]);
+          } else {
+            setMessages(loadedMessages);
+          }
+
+          // Collapse historical cards by default
+          const historicalIds = new Set<string>();
+          loadedMessages.forEach((msg: any) => {
+            if (msg.role === "assistant" && msg.answer) {
+              historicalIds.add(msg.id);
+            }
+          });
+          setCollapsedCardIds(historicalIds);
+        }
+      } catch (err) {
+        console.error("Failed to load chat logs from database:", err);
+      }
+    }
+
+    loadDbHistory();
+  }, [isLoggedIn, kakaoUser]);
+
   const handleKakaoLogin = () => {
     if (isAuthLoading) return;
     setIsAuthLoading(true);
@@ -305,10 +403,13 @@ export function VoiceCounselorApp() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Ensure all loaded historical messages have a valid timestamp property so they don't dynamically sync to the current time
-          const validated = parsed.map((msg: any) => ({
-            ...msg,
-            timestamp: msg.timestamp || new Date().toISOString()
-          }));
+          const validated = parsed.map((msg: any) => {
+            const hasValidTimestamp = msg.timestamp && msg.timestamp !== "undefined" && msg.timestamp !== "null";
+            return {
+              ...msg,
+              timestamp: hasValidTimestamp ? msg.timestamp : new Date().toISOString()
+            };
+          });
           setMessages(validated);
           
           // Collapse all historical cards by default on load
@@ -1915,9 +2016,9 @@ function MessageBubble({
     }
 
     return (
-      <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative" }}>
-        <div className="card-top" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", width: "100%", minHeight: "40px", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
-          <div style={{ flex: 1, textAlign: "center", display: "flex", justifyContent: "center", paddingLeft: "90px", paddingRight: "90px" }}>
+      <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative", maxWidth: "100%", width: "100%", boxSizing: "border-box" }}>
+        <div className="card-top" style={{ display: "flex", alignItems: "center", width: "100%", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
+          <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0, paddingLeft: "12px", paddingRight: "12px" }}>
             {ans.headline && (
               <h3 
                 className="card-headline-title" 
@@ -1928,6 +2029,9 @@ function MessageBubble({
                   color: "var(--text-ink)", 
                   fontStyle: "italic", 
                   lineHeight: "1.3",
+                  textAlign: "center",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                   whiteSpace: "nowrap"
                 }}
               >
@@ -1935,7 +2039,7 @@ function MessageBubble({
               </h3>
             )}
           </div>
-          <button className="zoom-toggle-btn" style={{ position: "absolute", right: 0 }} onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
+          <button className="zoom-toggle-btn" style={{ flexShrink: 0 }} onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
             {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
           </button>
         </div>
@@ -1954,11 +2058,7 @@ function MessageBubble({
             >
               <div className="accordion-header-content">
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <svg viewBox="0 0 24 24" fill="#ffea00" stroke="#b45309" strokeWidth="2" style={{ width: "16px", height: "16px", marginRight: "2px" }}>
-                    <path d="M9 21h6v-1.3c0-.4.2-.7.5-1A8 8 0 1 0 8 10c0 2.2.9 4.2 2.5 5.7.3.3.5.6.5 1V21z" strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="9" y1="18" x2="15" y2="18" strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="10" y1="15" x2="14" y2="15" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <span style={{ color: "var(--accent-green)", marginRight: "4px", fontSize: "13px", fontWeight: "bold" }}>★</span>
                   <span style={{ fontWeight: "700", fontSize: "12.5px", color: "var(--text-ink)" }}>질문 이해 및 분석근거</span>
                 </div>
                 <span className="accordion-toggle-tag">
@@ -2114,14 +2214,15 @@ function MessageBubble({
             position: "absolute",
             bottom: "-12px",
             right: "12px",
-            width: "28px",
             height: "28px",
+            padding: "0 8px",
             backgroundColor: isShareHovered ? "#245d55" : "var(--accent-green)",
             border: "1.5px solid var(--text-ink)",
             borderRadius: "4px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            gap: "4px",
             cursor: "pointer",
             boxShadow: isShareHovered ? "2px 2px 0px var(--text-ink)" : "1.5px 1.5px 0px var(--text-ink)",
             transform: isShareHovered ? "scale(1.05) translateY(-1px)" : "none",
@@ -2129,13 +2230,14 @@ function MessageBubble({
             transition: "all 0.1s ease"
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "14px", height: "14px", stroke: "white" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "12px", height: "12px", stroke: "white" }}>
             <circle cx="18" cy="5" r="3"/>
             <circle cx="6" cy="12" r="3"/>
             <circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
+          <span style={{ fontSize: "11px", fontWeight: "850", color: "white" }}>공유</span>
         </div>
       </article>
     );
@@ -2284,7 +2386,7 @@ function getFormattedTime(isoString?: string): string {
 const stableFallbackDate = new Date();
 
 function parseSafeDate(dateStr?: string): Date {
-  if (!dateStr) return stableFallbackDate;
+  if (!dateStr || dateStr === "undefined" || dateStr === "null") return new Date();
   
   let formatted = dateStr;
   if (typeof dateStr === "string" && !dateStr.includes("T")) {
@@ -2296,5 +2398,5 @@ function parseSafeDate(dateStr?: string): Date {
     return parsed;
   }
   
-  return stableFallbackDate;
+  return new Date();
 }

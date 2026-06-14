@@ -337,6 +337,7 @@ body {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden !important;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -356,9 +357,9 @@ body {
 
 .message-wrapper.card-wrapper {
   max-width: 100% !important;
-  width: calc(100% + 24px) !important;
-  margin-left: -12px !important;
-  margin-right: -12px !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   align-self: center;
 }
 
@@ -547,8 +548,9 @@ body {
   flex-direction: column;
   gap: 16px;
   box-shadow: 4px 4px 0px var(--text-ink);
-  max-width: 100%;
-  width: 100%;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .answer-card strong, .answer-card b {
@@ -940,9 +942,9 @@ body {
   
   .message-wrapper.card-wrapper {
     max-width: 100% !important;
-    width: calc(100% + 16px) !important;
-    margin-left: -8px !important;
-    margin-right: -8px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
   
   .message-wrapper.card-wrapper .bubble-wrapper {
@@ -2219,6 +2221,6 @@ body {
   margin-top: 4px;
 }
 .card-wrapper .chat-time-label.assistant-time {
-  margin-right: 48px; /* Shift timestamp left to prevent overlap with floating share button */
+  margin-right: 80px; /* Shift timestamp left to prevent overlap with floating share button containing '공유' text */
 }
 
