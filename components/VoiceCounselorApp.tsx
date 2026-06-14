@@ -1481,7 +1481,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {kakaoUser ? (
                 <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>
-                  {kakaoUser.nickname.replace(/\s*PA$/, "").trim()} PA님
+                  {formatNicknamePA(kakaoUser.nickname)}
                 </h2>
               ) : (
                 <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>PA님</h2>
@@ -1724,6 +1724,11 @@ function cleanListText(text: string | undefined): string {
     cleaned = cleaned.substring(2).trim();
   }
   return cleaned;
+}
+
+function formatNicknamePA(nickname: string): string {
+  if (!nickname) return "PA님";
+  return nickname.replace(/\s*(?:PA|님|PA님)+$/, "").trim() + " PA님";
 }
 
 function MessageBubble({
@@ -2029,7 +2034,7 @@ function MessageBubble({
             <span className="welcome-banner-badge">NOTICE</span>
           </div>
           <div className="welcome-banner-body">
-            <p className="welcome-greet">반갑습니다 {kakaoUser ? `${kakaoUser.nickname}PA님!` : "PA님!"} 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
+            <p className="welcome-greet">반갑습니다 {kakaoUser ? `${formatNicknamePA(kakaoUser.nickname)}!` : "PA님!"} 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
             <p className="welcome-instruction">
               우측 상단의 <strong className="highlight-text-green">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어, 보상 규정 및 주요 면책 조건에 대해 편하게 코칭을 받으실 수 있습니다.
             </p>
