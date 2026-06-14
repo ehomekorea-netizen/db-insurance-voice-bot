@@ -173,7 +173,7 @@ export async function POST(request: Request) {
       ],
       tools: useWebSearch ? [
         {
-          googleSearch: {}
+          google_search: {}
         }
       ] : undefined,
       systemInstruction: {
