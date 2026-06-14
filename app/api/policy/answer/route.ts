@@ -246,38 +246,62 @@ export async function POST(request: Request) {
 
             let braceCount = 0;
             let startIndex = -1;
+            let inString = false;
+            let escapeNext = false;
+
             for (let i = 0; i < buffer.length; i++) {
-              if (buffer[i] === "{") {
-                if (braceCount === 0) {
-                  startIndex = i;
-                }
-                braceCount++;
-              } else if (buffer[i] === "}") {
-                braceCount--;
-                if (braceCount === 0 && startIndex !== -1) {
-                  const jsonStr = buffer.substring(startIndex, i + 1);
-                  try {
-                    const obj = JSON.parse(jsonStr);
-                    const text = obj.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                    if (text) {
-                      fullText += text;
-                      writeChunk(text);
-                    }
-                    const meta = obj.candidates?.[0]?.groundingMetadata;
-                    if (meta) {
-                      groundingMetadata = { ...groundingMetadata, ...meta };
-                    }
-                    const usage = obj.usageMetadata;
-                    if (usage) {
-                      promptTokenCount = usage.promptTokenCount || promptTokenCount;
-                      candidatesTokenCount = usage.candidatesTokenCount || candidatesTokenCount;
-                    }
-                  } catch (e) {
-                    console.error("[Gemini Stream] JSON Parse error for chunk:", e);
+              const char = buffer[i];
+
+              if (escapeNext) {
+                escapeNext = false;
+                continue;
+              }
+
+              if (char === '\\') {
+                escapeNext = true;
+                continue;
+              }
+
+              if (char === '"') {
+                inString = !inString;
+                continue;
+              }
+
+              if (!inString) {
+                if (char === "{") {
+                  if (braceCount === 0) {
+                    startIndex = i;
                   }
-                  buffer = buffer.substring(i + 1);
-                  i = -1;
-                  startIndex = -1;
+                  braceCount++;
+                } else if (char === "}") {
+                  braceCount--;
+                  if (braceCount === 0 && startIndex !== -1) {
+                    const jsonStr = buffer.substring(startIndex, i + 1);
+                    try {
+                      const obj = JSON.parse(jsonStr);
+                      const text = obj.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                      if (text) {
+                        fullText += text;
+                        writeChunk(text);
+                      }
+                      const meta = obj.candidates?.[0]?.groundingMetadata;
+                      if (meta) {
+                        groundingMetadata = { ...groundingMetadata, ...meta };
+                      }
+                      const usage = obj.usageMetadata;
+                      if (usage) {
+                        promptTokenCount = usage.promptTokenCount || promptTokenCount;
+                        candidatesTokenCount = usage.candidatesTokenCount || candidatesTokenCount;
+                      }
+                    } catch (e) {
+                      console.error("[Gemini Stream] JSON Parse error for chunk:", e);
+                    }
+                    buffer = buffer.substring(i + 1);
+                    i = -1;
+                    startIndex = -1;
+                    inString = false;
+                    escapeNext = false;
+                  }
                 }
               }
             }
