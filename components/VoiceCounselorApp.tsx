@@ -1149,7 +1149,6 @@ export function VoiceCounselorApp() {
       
       tempMessageId = generateUUID();
       const now = new Date();
-      const formattedTime = getFormattedTimeWithDay(now);
 
       // Optimistically add an empty assistant card so we can stream into it
       setMessages((current) => [
@@ -1158,7 +1157,7 @@ export function VoiceCounselorApp() {
           id: tempMessageId,
           role: "assistant",
           content: "답변을 생성하는 중입니다...",
-          timestamp: formattedTime
+          timestamp: now.toISOString()
         } as ChatMessage
       ]);
 
@@ -1336,6 +1335,7 @@ export function VoiceCounselorApp() {
       ...current,
       {
         id: generateUUID(),
+        timestamp: new Date().toISOString(),
         ...message
       } as ChatMessage
     ]);
@@ -1606,21 +1606,14 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               )}
 
               <div className={`message-wrapper ${wrapperClass}`}>
-                {message.role === "user" && (
-                  <span className="chat-time-label user-time">
-                    {formattedTime}
-                  </span>
-                )}
-
                 {message.role === "assistant" && !isCard && (
                   <div className="avatar-wrapper">
                     <img src="/promy.png" alt="PROMY" className="avatar-img" />
                   </div>
                 )}
 
-                <div className="bubble-wrapper">
-                  {message.role === "assistant" && !isCard && <span className="sender-name">동목포 오멘토</span>}
-                  {message.role === "user" && <span className="sender-name">{kakaoUser?.nickname || "나"}</span>}
+                <div className="bubble-wrapper" style={{ width: isCard ? "100%" : "auto" }}>
+                  {message.role === "assistant" && !isCard && <span className="sender-name">오멘토</span>}
                   <MessageBubble
                     message={message}
                     onShare={(ans) => handleShareText(ans)}
@@ -1628,13 +1621,12 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={() => toggleCardCollapse(message.id)}
                   />
+                  {message.role === "assistant" && (
+                    <span className="chat-time-label assistant-time">
+                      {formattedTime}
+                    </span>
+                  )}
                 </div>
-
-                {message.role === "assistant" && (
-                  <span className="chat-time-label assistant-time">
-                    {formattedTime}
-                  </span>
-                )}
 
                 {message.role === "user" && (
                   <div className="avatar-wrapper">
@@ -1656,7 +1648,6 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         {userLiveTranscript && (
           <div className="message-wrapper user-wrapper">
             <div className="bubble-wrapper">
-              <span className="sender-name">{kakaoUser?.nickname || "나"} (말하는 중)</span>
               <div className="message user-bubble live-typing-bubble">
                 <div className="live-transcript-header">
                   <span className="live-transcript-tag">🎙️ 음성 인식 중</span>
@@ -1811,6 +1802,7 @@ function MessageBubble({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isClothespinHovered, setIsClothespinHovered] = useState(false);
+  const [isShareHovered, setIsShareHovered] = useState(false);
 
   if (message.role === "assistant" && !message.answer) {
     const isWelcomeText = message.content.includes("PA님 무엇을 도와드릴까요?");
@@ -1845,10 +1837,10 @@ function MessageBubble({
           style={{ 
             cursor: "pointer", 
             display: "flex", 
-            alignItems: "center", 
-            justifyContent: "space-between", 
-            gap: "12px",
-            width: "fit-content",
+            flexDirection: "column",
+            alignItems: "stretch", 
+            gap: "8px",
+            width: "100%",
             maxWidth: "100%"
           }}
         >
@@ -1858,27 +1850,30 @@ function MessageBubble({
             fontSize: "13px", 
             whiteSpace: "normal", 
             wordBreak: "keep-all", 
-            overflowWrap: "break-word" 
+            overflowWrap: "break-word",
+            display: "block",
+            color: "var(--text-ink)"
           }}>
             {quotedHeadline}
           </span>
-          <button 
-            className="expand-action-btn"
-            style={{
-              flexShrink: 0,
-              fontSize: "11px",
-              fontWeight: "900",
-              backgroundColor: "var(--highlight-yellow)",
-              border: "1.5px solid var(--text-ink)",
-              padding: "2px 8px",
-              borderRadius: "6px",
-              cursor: "pointer",
-              boxShadow: "1.5px 1.5px 0px var(--text-ink)",
-              color: "var(--text-ink)"
-            }}
-          >
-            답변 펼치기 ▼
-          </button>
+          <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+            <button 
+              className="expand-action-btn"
+              style={{
+                fontSize: "11px",
+                fontWeight: "900",
+                backgroundColor: "var(--highlight-yellow)",
+                border: "1.5px solid var(--text-ink)",
+                padding: "2px 8px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+                color: "var(--text-ink)"
+              }}
+            >
+              답변 펼치기 ▼
+            </button>
+          </div>
         </div>
       );
     }
@@ -2095,13 +2090,39 @@ function MessageBubble({
           </footer>
         )}
 
-        <div className="card-bottom-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", borderTop: "1.5px solid var(--text-ink)", paddingTop: "12px", gap: "12px" }}>
-          <span className="card-bottom-timestamp" style={{ fontSize: "13.5px", fontWeight: "800", color: "#000000" }}>
-            조회 시간: {message.timestamp || getFormattedTimeWithDay(new Date())}
-          </span>
-          <button className="share-action-btn" onClick={() => onShare(ans)} title="공유하기">
-            공유 📤
-          </button>
+        {/* Floating Share Button - Bottom Right */}
+        <div 
+          className="share-btn-floating" 
+          onClick={() => onShare(ans)}
+          onMouseEnter={() => setIsShareHovered(true)}
+          onMouseLeave={() => setIsShareHovered(false)}
+          title="공유하기"
+          style={{
+            position: "absolute",
+            bottom: "-10px",
+            right: "10px",
+            width: "22px",
+            height: "22px",
+            backgroundColor: isShareHovered ? "#245d55" : "var(--accent-green)",
+            border: "1.5px solid var(--text-ink)",
+            borderRadius: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            boxShadow: isShareHovered ? "2px 2px 0px var(--text-ink)" : "1.5px 1.5px 0px var(--text-ink)",
+            transform: isShareHovered ? "scale(1.05) translateY(-1px)" : "none",
+            zIndex: 20,
+            transition: "all 0.1s ease"
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "11px", height: "11px", stroke: "white" }}>
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
         </div>
       </article>
     );
@@ -2220,19 +2241,21 @@ function correctSttErrors(text: string): string {
   return corrected;
 }
 
-function getFormattedDateDivider(isoString: string): string {
+function getFormattedDateDivider(isoString?: string): string {
   try {
-    const date = new Date(isoString);
+    const date = parseSafeDate(isoString);
     const days = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
     return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}`;
   } catch {
-    return "";
+    const date = new Date();
+    const days = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}`;
   }
 }
 
-function getFormattedTime(isoString: string): string {
+function getFormattedTime(isoString?: string): string {
   try {
-    const date = new Date(isoString);
+    const date = parseSafeDate(isoString);
     let hours = date.getHours();
     const minutes = date.getMinutes();
     const ampm = hours >= 12 ? "오후" : "오전";
@@ -2243,4 +2266,20 @@ function getFormattedTime(isoString: string): string {
   } catch {
     return "";
   }
+}
+
+function parseSafeDate(dateStr?: string): Date {
+  if (!dateStr) return new Date();
+  
+  let formatted = dateStr;
+  if (typeof dateStr === "string" && !dateStr.includes("T")) {
+    formatted = dateStr.replace(/-/g, "/");
+  }
+  
+  const parsed = new Date(formatted);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  
+  return new Date();
 }
