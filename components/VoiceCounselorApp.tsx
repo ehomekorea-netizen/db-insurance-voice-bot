@@ -1716,19 +1716,17 @@ function MessageBubble({
     const ans = message.answer;
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
-        <div className="card-top">
-          <div className="card-top-left" style={{ flex: 1, minWidth: 0, paddingRight: "8px" }}>
+        <div className="card-top" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", width: "100%", minHeight: "40px", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
+          <div style={{ flex: 1, textAlign: "center", paddingRight: "110px", paddingLeft: "10px" }}>
             {ans.headline && (
-              <h3 className="card-headline-title" style={{ margin: 0, fontSize: "14.5px", fontWeight: "800", color: "var(--text-ink)", fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <h3 className="card-headline-title" style={{ margin: 0, fontSize: "17.5px", fontWeight: "900", color: "var(--text-ink)", fontStyle: "italic", lineHeight: "1.3" }}>
                 {ans.headline}
               </h3>
             )}
           </div>
-          <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-            <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
-              {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
-            </button>
-          </div>
+          <button className="zoom-toggle-btn" style={{ position: "absolute", right: 0 }} onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
+            {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
+          </button>
         </div>
 
         {/* 질문 이해 및 분석 근거 (최상단 아코디언 배치) */}
@@ -1892,11 +1890,11 @@ function MessageBubble({
         )}
 
         <div className="card-bottom-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", borderTop: "1.5px solid var(--text-ink)", paddingTop: "12px", gap: "12px" }}>
-          <span className="card-bottom-timestamp" style={{ fontSize: "11px", fontWeight: "800", color: "#000000" }}>
+          <span className="card-bottom-timestamp" style={{ fontSize: "13.5px", fontWeight: "800", color: "#000000" }}>
             조회 시간: {message.timestamp || getFormattedTimeWithDay(new Date())}
           </span>
           <button className="share-action-btn" onClick={() => onShare(ans)} title="공유하기">
-            공유 🔗
+            공유 📤
           </button>
         </div>
       </article>

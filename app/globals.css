@@ -1374,29 +1374,29 @@ body {
 /* Share Action Button: Soft Coral Theme */
 .share-action-btn {
   background: #fff5f2 !important;
-  border: 2px solid var(--text-ink) !important;
+  border: 2px solid #000000 !important;
   color: #c2410c !important;
-  box-shadow: 2px 2px 0px var(--text-ink) !important;
+  box-shadow: 2px 2px 0px #000000 !important;
 }
 
 .share-action-btn:hover {
   background: #ffebe6 !important;
   transform: translateY(-1px) !important;
-  box-shadow: 3px 3px 0px var(--text-ink) !important;
+  box-shadow: 3px 3px 0px #000000 !important;
 }
 
-/* Zoom Control: Soft Green Theme */
+/* Zoom Control: Tactile Yellow & Black */
 .zoom-toggle-btn {
-  background: #f0fdf4 !important;
-  border: 2px solid var(--text-ink) !important;
-  color: #15803d !important;
-  box-shadow: 2px 2px 0px var(--text-ink) !important;
+  background: #facc15 !important;
+  border: 2px solid #000000 !important;
+  color: #000000 !important;
+  box-shadow: 2px 2px 0px #000000 !important;
 }
 
 .zoom-toggle-btn:hover {
-  background: #e8fded !important;
+  background: #eab308 !important;
   transform: translateY(-1px) !important;
-  box-shadow: 3px 3px 0px var(--text-ink) !important;
+  box-shadow: 3px 3px 0px #000000 !important;
 }
 
 /* Model Pill Badge: Static Button Styling */
