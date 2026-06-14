@@ -305,3 +305,31 @@ export async function getUserChatLogs(userId: string): Promise<ChatLogEntry[]> {
   }
 }
 
+// 사용자별 대화 히스토리 전체 삭제 (디스크 물리적 영구 삭제)
+export async function deleteUserChatLogs(userId: string): Promise<boolean> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return false;
+
+  try {
+    const logs = await getUserChatLogs(userId);
+    if (logs.length === 0) return true;
+
+    // 각 대화 문서를 개별적으로 DELETE 요청하여 공간을 완전하게 반환(영구삭제)
+    const deletePromises = logs.map(async (log) => {
+      const res = await fetch(`${baseUrl}/chat_logs/${log.id}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        console.error(`[FIREBASE] Failed to delete document ${log.id}: ${res.statusText}`);
+      }
+    });
+
+    await Promise.all(deletePromises);
+    return true;
+  } catch (err) {
+    console.error(`[FIREBASE] deleteUserChatLogs error for user ${userId}:`, err);
+    return false;
+  }
+}
+
+

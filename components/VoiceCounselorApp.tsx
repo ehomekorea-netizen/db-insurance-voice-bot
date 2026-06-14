@@ -1480,7 +1480,9 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {kakaoUser ? (
-                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>{kakaoUser.nickname}님</h2>
+                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>
+                  {kakaoUser.nickname.replace(/\s*PA$/, "").trim()} PA님
+                </h2>
               ) : (
                 <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>PA님</h2>
               )}
@@ -1796,7 +1798,7 @@ function MessageBubble({
     }
 
     return (
-      <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
+      <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative" }}>
         {/* Clothespin / Binder Clip fold button */}
         <div 
           className="clothespin-btn" 

@@ -168,6 +168,30 @@ export default function AdminPage() {
     }
   };
 
+  // Delete user's chat logs in Firebase (hard delete)
+  const handleDeleteChatLogs = async (userId: string) => {
+    if (!window.confirm("이 사용자의 모든 대화 기록을 DB(Firebase)에서 영구적으로 삭제하시겠습니까?\n삭제된 데이터는 완전히 지워지며 복구할 수 없습니다.")) return;
+
+    try {
+      const res = await fetch(`/api/admin/messages?userId=${userId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error("대화 기록 삭제에 실패했습니다.");
+      }
+      const data = await res.json();
+      if (data.success) {
+        alert("대화 기록을 DB에서 영구 삭제하여 보관 공간을 확보했습니다.");
+        setChatLogs([]);
+      }
+    } catch (err: any) {
+      alert(err.message || "삭제 도중 에러가 발생했습니다.");
+    }
+  };
+
   const formatDate = (isoStr: string) => {
     try {
       const date = new Date(isoStr);
@@ -339,14 +363,38 @@ export default function AdminPage() {
       {selectedUserId && (
         <div className="admin-modal-overlay" onClick={() => setSelectedUserId(null)}>
           <div className="admin-modal-card" onClick={(e) => e.stopPropagation()}>
-            <header className="modal-header">
+            <header className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <h2>{selectedUserNickname}님의 대화 기록</h2>
                 <p>카카오 ID: {selectedUserId}</p>
               </div>
-              <button className="modal-close-btn" onClick={() => setSelectedUserId(null)}>
-                &times;
-              </button>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {chatLogs.length > 0 && (
+                  <button 
+                    onClick={() => handleDeleteChatLogs(selectedUserId)}
+                    style={{
+                      background: "#fee2e2",
+                      border: "2px solid var(--text-ink, #20343A)",
+                      color: "#991b1b",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      fontSize: "12.5px",
+                      fontWeight: "800",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      boxShadow: "2px 2px 0px var(--text-ink, #20343A)"
+                    }}
+                    title="이 사용자의 전체 대화 기록 영구 삭제"
+                  >
+                    대화 삭제 🗑️
+                  </button>
+                )}
+                <button className="modal-close-btn" onClick={() => setSelectedUserId(null)}>
+                  &times;
+                </button>
+              </div>
             </header>
             
             <div className="modal-body">
