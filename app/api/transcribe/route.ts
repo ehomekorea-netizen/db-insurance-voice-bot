@@ -67,9 +67,9 @@ export async function POST(request: Request) {
     const promptTokenCount = usage.promptTokenCount || 0;
     const candidatesTokenCount = usage.candidatesTokenCount || 0;
 
-    // gemini-3.1-flash-lite pricing: $0.25/1M input, $1.50/1M output * 1400₩
-    const inputCost = promptTokenCount * 0.00035;
-    const outputCost = candidatesTokenCount * 0.0021;
+    // gemini-3.1-flash-lite pricing: $0.125/1M input, $0.75/1M output * 1400₩ (official pricing)
+    const inputCost = promptTokenCount * 0.000175;
+    const outputCost = candidatesTokenCount * 0.00105;
     const cost = inputCost + outputCost;
 
     const userId = formData.get("userId") as string;
@@ -77,8 +77,8 @@ export async function POST(request: Request) {
     if (userId && cost > 0) {
       try {
         const { incrementUserCost } = await import("@/lib/firebase");
-        // Update user's geminiCost field since we are now using Gemini for STT!
-        await incrementUserCost(userId, "gemini", cost);
+        // Save STT cost in whisperCost field (represented as STT 사용료 in UI)
+        await incrementUserCost(userId, "whisper", cost);
         console.log(`[Gemini STT Cost Log] Added ₩${cost.toFixed(4)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}) to user ${userId}`);
       } catch (dbErr) {
         console.error("[Gemini STT Cost Log] Failed to update user cost:", dbErr);

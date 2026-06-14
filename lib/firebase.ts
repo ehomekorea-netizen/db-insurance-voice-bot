@@ -6,6 +6,7 @@ export interface FirestoreUser {
   updatedAt: string;
   geminiCost: number;
   whisperCost: number;
+  groundingCount: number;
 }
 
 const getBaseUrl = () => {
@@ -50,7 +51,8 @@ export async function upsertUser(
   profileImage: string,
   status?: "approved" | "blocked",
   geminiCost?: number,
-  whisperCost?: number
+  whisperCost?: number,
+  groundingCount?: number
 ): Promise<FirestoreUser | null> {
   const baseUrl = getBaseUrl();
   if (!baseUrl) return null;
@@ -61,6 +63,7 @@ export async function upsertUser(
     const finalStatus = status || existing?.status || "approved";
     const finalGeminiCost = geminiCost !== undefined ? geminiCost : (existing?.geminiCost || 0);
     const finalWhisperCost = whisperCost !== undefined ? whisperCost : (existing?.whisperCost || 0);
+    const finalGroundingCount = groundingCount !== undefined ? groundingCount : (existing?.groundingCount || 0);
 
     const fields: any = {
       nickname: { stringValue: nickname },
@@ -68,6 +71,7 @@ export async function upsertUser(
       status: { stringValue: finalStatus },
       geminiCost: { doubleValue: finalGeminiCost },
       whisperCost: { doubleValue: finalWhisperCost },
+      groundingCount: { integerValue: finalGroundingCount },
       updatedAt: { stringValue: new Date().toISOString() }
     };
 
@@ -95,7 +99,8 @@ export async function upsertUser(
 export async function incrementUserCost(
   kakaoId: string,
   type: "gemini" | "whisper",
-  amount: number
+  amount: number,
+  groundingIncrement: number = 0
 ): Promise<FirestoreUser | null> {
   const baseUrl = getBaseUrl();
   if (!baseUrl) return null;
@@ -109,12 +114,14 @@ export async function incrementUserCost(
 
     let geminiCost = existing.geminiCost || 0;
     let whisperCost = existing.whisperCost || 0;
+    let groundingCount = existing.groundingCount || 0;
 
     if (type === "gemini") {
       geminiCost += amount;
     } else if (type === "whisper") {
       whisperCost += amount;
     }
+    groundingCount += groundingIncrement;
 
     const fields: any = {
       nickname: { stringValue: existing.nickname },
@@ -122,6 +129,7 @@ export async function incrementUserCost(
       status: { stringValue: existing.status },
       geminiCost: { doubleValue: geminiCost },
       whisperCost: { doubleValue: whisperCost },
+      groundingCount: { integerValue: groundingCount },
       updatedAt: { stringValue: new Date().toISOString() }
     };
 
@@ -192,6 +200,13 @@ function parseFirestoreDoc(doc: any): FirestoreUser | null {
     return 0;
   };
 
+  const parseInteger = (val: any) => {
+    if (!val) return 0;
+    if (val.integerValue !== undefined) return Number(val.integerValue);
+    if (val.doubleValue !== undefined) return Number(val.doubleValue);
+    return 0;
+  };
+
   return {
     id,
     nickname: fields.nickname?.stringValue || "",
@@ -199,7 +214,8 @@ function parseFirestoreDoc(doc: any): FirestoreUser | null {
     status: (fields.status?.stringValue || "approved") as "approved" | "blocked",
     updatedAt: fields.updatedAt?.stringValue || new Date().toISOString(),
     geminiCost: parseCost(fields.geminiCost),
-    whisperCost: parseCost(fields.whisperCost)
+    whisperCost: parseCost(fields.whisperCost),
+    groundingCount: parseInteger(fields.groundingCount)
   };
 }
 

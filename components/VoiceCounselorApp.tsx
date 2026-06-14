@@ -306,28 +306,50 @@ export function VoiceCounselorApp() {
             };
           });
 
-          // Prepend welcome message if not present in loadedMessages
-          const hasWelcome = loadedMessages.some((m: any) => m.id === "welcome" || m.content.includes("PA님 무엇을 도와드릴까요?"));
-          if (!hasWelcome) {
+          const clearTimestampStr = localStorage.getItem("db_insurance_chat_clear_timestamp");
+          const clearTime = clearTimestampStr ? new Date(clearTimestampStr).getTime() : 0;
+
+          // Filter out messages created before the clear timestamp
+          const filteredMessages = loadedMessages.filter((msg: any) => {
+            if (!msg.timestamp) return true;
+            const msgTime = new Date(msg.timestamp).getTime();
+            return msgTime > clearTime;
+          });
+
+          if (filteredMessages.length > 0) {
+            // Prepend welcome message if not present in filteredMessages
+            const hasWelcome = filteredMessages.some((m: any) => m.id === "welcome" || m.content.includes("PA님 무엇을 도와드릴까요?"));
+            if (!hasWelcome) {
+              const welcomeMsg = {
+                id: "welcome",
+                role: "system",
+                content: "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다.",
+                timestamp: filteredMessages[0]?.timestamp || new Date().toISOString()
+              };
+              setMessages([welcomeMsg as ChatMessage, ...filteredMessages]);
+            } else {
+              setMessages(filteredMessages);
+            }
+
+            // Collapse historical cards by default
+            const historicalIds = new Set<string>();
+            filteredMessages.forEach((msg: any) => {
+              if (msg.role === "assistant" && msg.answer) {
+                historicalIds.add(msg.id);
+              }
+            });
+            setCollapsedCardIds(historicalIds);
+          } else if (clearTime > 0) {
+            // User explicitly cleared history, and there are no new messages after that
             const welcomeMsg = {
               id: "welcome",
               role: "system",
               content: "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다.",
-              timestamp: loadedMessages[0]?.timestamp || new Date().toISOString()
+              timestamp: new Date().toISOString()
             };
-            setMessages([welcomeMsg as ChatMessage, ...loadedMessages]);
-          } else {
-            setMessages(loadedMessages);
+            setMessages([welcomeMsg as ChatMessage]);
+            setCollapsedCardIds(new Set());
           }
-
-          // Collapse historical cards by default
-          const historicalIds = new Set<string>();
-          loadedMessages.forEach((msg: any) => {
-            if (msg.role === "assistant" && msg.answer) {
-              historicalIds.add(msg.id);
-            }
-          });
-          setCollapsedCardIds(historicalIds);
         }
       } catch (err) {
         console.error("Failed to load chat logs from database:", err);
@@ -455,6 +477,7 @@ export function VoiceCounselorApp() {
 
   function clearChatHistory() {
     if (window.confirm("기존 대화 내역을 모두 삭제하시겠습니까?")) {
+      localStorage.setItem("db_insurance_chat_clear_timestamp", new Date().toISOString());
       localStorage.removeItem("db_insurance_chat_history");
       setMessages([
         {
@@ -1774,7 +1797,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={() => toggleCardCollapse(message.id)}
                   />
-                  {message.role === "assistant" && (
+                  {message.role === "assistant" && !isCard && (
                     <span className="chat-time-label assistant-time">
                       {formattedTime}
                     </span>

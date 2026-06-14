@@ -10,6 +10,7 @@ interface UserRecord {
   updatedAt: string;
   geminiCost?: number;
   whisperCost?: number;
+  groundingCount?: number;
 }
 
 export default function AdminPage() {
@@ -288,8 +289,8 @@ export default function AdminPage() {
                     <th>프로필</th>
                     <th>닉네임</th>
                     <th>카카오 ID</th>
-                    <th>Gemini 비용</th>
-                    <th>Whisper 비용</th>
+                    <th>STT 사용료</th>
+                    <th>Gemini 3.1 Flash-Lite 비용 (그라운딩 횟수)</th>
                     <th>총 비용</th>
                     <th>최종 활동 시각</th>
                     <th>상태</th>
@@ -313,10 +314,10 @@ export default function AdminPage() {
                       <td className="font-bold">{user.nickname}</td>
                       <td className="text-gray">{user.id}</td>
                       <td>
-                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                       </td>
                       <td>
-                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ({user.groundingCount || 0}회)
                       </td>
                       <td style={{ fontWeight: "700" }}>
                         ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}

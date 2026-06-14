@@ -521,11 +521,11 @@ export async function POST(request: Request) {
 
           // Accumulate Gemini Cost (USD/KRW converted with rate 1,400₩/$1)
           if (userId && (promptTokenCount > 0 || candidatesTokenCount > 0)) {
-            // gemini-3.1-flash-lite: $0.25/1M input, $1.50/1M output
+            // gemini-3.1-flash-lite: $0.125/1M input, $0.75/1M output (official pricing)
             // gemini-2.5-flash: $0.30/1M input, $2.50/1M output
             // gemini-2.0-flash-lite / gemini-1.5-flash: $0.075/1M input, $0.30/1M output
-            let inputRate = 0.00035; // default gemini-3.1-flash-lite ($0.25/1M * 1400₩)
-            let outputRate = 0.0021; // default gemini-3.1-flash-lite ($1.50/1M * 1400₩)
+            let inputRate = 0.000175; // default gemini-3.1-flash-lite ($0.125/1M * 1400₩)
+            let outputRate = 0.00105; // default gemini-3.1-flash-lite ($0.75/1M * 1400₩)
 
             if (modelName === "gemini-2.5-flash") {
               inputRate = 0.00042;   // $0.30/1M * 1400₩
@@ -538,11 +538,12 @@ export async function POST(request: Request) {
             const inputCost = promptTokenCount * inputRate;
             const outputCost = candidatesTokenCount * outputRate;
             const totalCost = inputCost + outputCost;
+            const groundingIncrement = usedSearch ? 1 : 0;
             try {
               // Dynamic import to prevent initialisation timing race conditions in Edge Runtime
               const { incrementUserCost } = await import("@/lib/firebase");
-              await incrementUserCost(userId, "gemini", totalCost);
-              console.log(`[Gemini Cost Log] Added ₩${totalCost.toFixed(3)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}) to user ${userId}`);
+              await incrementUserCost(userId, "gemini", totalCost, groundingIncrement);
+              console.log(`[Gemini Cost Log] Added ₩${totalCost.toFixed(3)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}, Grounding: ${groundingIncrement}) to user ${userId}`);
             } catch (dbErr) {
               console.error("[Gemini Cost Log] Failed to update user cost:", dbErr);
             }
