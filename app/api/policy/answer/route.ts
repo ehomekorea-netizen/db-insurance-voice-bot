@@ -287,6 +287,7 @@ export async function POST(request: Request) {
                       }
                       const meta = obj.candidates?.[0]?.groundingMetadata;
                       if (meta) {
+                        console.log(`[Gemini Stream] Detected groundingMetadata chunk: ${JSON.stringify(meta)}`);
                         if (!groundingMetadata) {
                           groundingMetadata = {};
                         }
@@ -323,6 +324,9 @@ export async function POST(request: Request) {
           }
 
           // Stream completed!
+          console.log(`[Gemini Stream Done] fullText length: ${fullText.length}`);
+          console.log(`[Gemini Stream Done] Raw groundingMetadata accumulated: ${JSON.stringify(groundingMetadata)}`);
+
           // Extract citations from the full generated response
           const markdownCitations: Array<{ title: string; url: string }> = [];
           const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\s*\((https?:\/\/[^\)]+)\)/g;
@@ -347,6 +351,8 @@ export async function POST(request: Request) {
               });
             }
           }
+
+          console.log(`[Gemini Stream Done] Extracted markdownCitations: ${JSON.stringify(markdownCitations)}`);
 
           let citations = [];
           if (markdownCitations.length > 0) {
@@ -423,6 +429,8 @@ export async function POST(request: Request) {
               };
             });
           }
+
+          console.log(`[Gemini Stream Done] Final citations array (${citations.length} items): ${JSON.stringify(citations)}`);
 
           const cleanResponseText = fullText.replace(citationRegex, "").trim();
           const isSimpleChat = cleanResponseText.length < 250 && !cleanResponseText.includes("[분석 배경 및 이해]") && !cleanResponseText.includes("[조건]");

@@ -1167,6 +1167,7 @@ export function VoiceCounselorApp() {
               );
             } else if (currentEvent === "metadata") {
               metadata = JSON.parse(dataStr);
+              console.log("[VoiceCounselorApp SSE] metadata event parsed:", metadata);
               
               setMessages((current) =>
                 current.map((msg) =>
@@ -1209,6 +1210,8 @@ export function VoiceCounselorApp() {
         isSimpleChat: metadata?.isSimpleChat || false,
         disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
       } as PolicyAnswer & { isSimpleChat?: boolean };
+
+      console.log("[VoiceCounselorApp SSE Done] finalPayload generated:", finalPayload);
 
       // Finally, update the text to include the automated ending notification if connected
       const contentText = isConnected
