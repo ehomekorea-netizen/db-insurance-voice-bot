@@ -143,6 +143,7 @@ export async function POST(request: Request) {
 - 사용자의 질문은 음성 인식(STT) 과정에서 발음 오타(예: '나비면제' -> '납입면제', '수치료/도수치로' -> '도수치료', '실선' -> '실손', '포장' -> '보장')로 입력될 수 있으므로, 문맥상 이를 알아듣고 올바른 보험 단어로 정정하여 이해하십시오.
 - 특히 사용자가 "다리가 문질러졌다", "문질러졌고"라고 질문하면 100% "부러졌다/골절"의 STT 오류이므로, 이를 "다리가 부러진 골절 사고"로 정정해서 이해하여 골절 진단비 및 5대 골절의 정의를 설명하십시오.
 - **[매우 중요]** 사용자의 질문을 내부적으로 보험 단어로 정정하여 이해했을 때, 답변 본문(특히 [분석 배경 및 이해])에 "다리가 문질러졌다는 골절의 STT 오타이므로 골절 사고로 정정해서 이해하고 답변을 작성합니다" 같은 **AI의 내부 보정 규칙이나 독백, 개발용 메타 설명을 절대 답변 텍스트로 노출하지 마십시오.** 사용자는 백엔드의 보정 알고리즘을 알 필요가 없으므로, 조용히 속으로만 정정하여 오직 정정된 골절 담보의 약관 팩트만 서술해 주십시오.
+- **[매우 중요: 가독성 극대화 및 볼드 처리]** 사용자가 필수 청구 서류명(예: 진단서, 영수증, 세부내역서 등), 핵심 보장 조건, 지급 면책 조항, 보장 한도 금액 등의 중요 정보를 한눈에 빠르게 파악할 수 있도록, **질문의 핵심 대답이 되는 단어와 필수 청구 서류명은 반드시 마크다운 두꺼운 글씨(볼드: **단어**)로 감싸서 강조**하여 출력하십시오.
 
 [응답 형식]
 [분석 배경 및 이해]
@@ -286,7 +287,21 @@ export async function POST(request: Request) {
                       }
                       const meta = obj.candidates?.[0]?.groundingMetadata;
                       if (meta) {
-                        groundingMetadata = { ...groundingMetadata, ...meta };
+                        if (!groundingMetadata) {
+                          groundingMetadata = {};
+                        }
+                        if (meta.webSearchQueries) {
+                          groundingMetadata.webSearchQueries = meta.webSearchQueries;
+                        }
+                        if (meta.searchEntryPoint) {
+                          groundingMetadata.searchEntryPoint = meta.searchEntryPoint;
+                        }
+                        if (meta.groundingChunks && meta.groundingChunks.length > 0) {
+                          groundingMetadata.groundingChunks = meta.groundingChunks;
+                        }
+                        if (meta.groundingSupports && meta.groundingSupports.length > 0) {
+                          groundingMetadata.groundingSupports = meta.groundingSupports;
+                        }
                       }
                       const usage = obj.usageMetadata;
                       if (usage) {
@@ -317,6 +332,20 @@ export async function POST(request: Request) {
               title: match[1].trim(),
               url: match[2].trim()
             });
+          }
+
+          // Fallback: parse general markdown links [Title](URL) in case formatting differs
+          const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+          let linkMatch;
+          while ((linkMatch = linkRegex.exec(fullText)) !== null) {
+            const title = linkMatch[1].trim();
+            const url = linkMatch[2].trim();
+            if (!markdownCitations.some(c => c.url === url) && !url.includes("kakaolink")) {
+              markdownCitations.push({
+                title: title.startsWith("출처:") ? title.replace("출처:", "").trim() : title,
+                url
+              });
+            }
           }
 
           let citations = [];

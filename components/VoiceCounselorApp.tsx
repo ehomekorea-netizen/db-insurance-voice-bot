@@ -1510,6 +1510,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 <MessageBubble
                   message={message}
                   onShare={(ans) => handleShareText(ans)}
+                  kakaoUser={kakaoUser}
                 />
               </div>
               {message.role === "user" && (
@@ -1660,10 +1661,12 @@ function cleanListText(text: string | undefined): string {
 
 function MessageBubble({
   message,
-  onShare
+  onShare,
+  kakaoUser
 }: {
   message: ChatMessage;
   onShare: (ans: PolicyAnswer) => void;
+  kakaoUser: { id: number; nickname: string; profileImage: string } | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -1875,7 +1878,7 @@ function MessageBubble({
             <span className="welcome-banner-badge">NOTICE</span>
           </div>
           <div className="welcome-banner-body">
-            <p className="welcome-greet">반갑습니다 PA님! 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
+            <p className="welcome-greet">반갑습니다 {kakaoUser ? `${kakaoUser.nickname}PA님!` : "PA님!"} 동목포 PA님들의 영업을 지원하는 든든한 멘토, 오멘토입니다. 😊</p>
             <p className="welcome-instruction">
               우측 상단의 <strong className="highlight-text-green">[도움요청 🎙️]</strong> 버튼을 누르시면 음성 상담이 활성화되어, 보상 규정 및 주요 면책 조건에 대해 편하게 코칭을 받으실 수 있습니다.
             </p>

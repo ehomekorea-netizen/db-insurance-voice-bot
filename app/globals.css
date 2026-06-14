@@ -551,6 +551,14 @@ body {
   width: 100%;
 }
 
+.answer-card strong, .answer-card b {
+  color: #c2410c !important;
+  background-color: rgba(249, 115, 22, 0.08) !important;
+  padding: 1px 4px !important;
+  border-radius: 4px !important;
+  font-weight: 850 !important;
+}
+
 .card-top {
   display: flex;
   justify-content: space-between;
