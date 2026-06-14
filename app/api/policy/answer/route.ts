@@ -40,7 +40,9 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 // Local database chunks lookup helper removed per client request to focus 100% on search grounding.
 
 function generateHeadline(question: string, summary: string): string {
-  const q = question.toLowerCase();
+  // Apply Korean Jamo Fuzzy Corrector first on the topic to avoid typos in headline
+  const correctedQuestion = correctInsuranceTerms(question);
+  const q = correctedQuestion.toLowerCase();
   let topic = "";
   if (q.includes("골절")) topic = "골절 진단비";
   else if (q.includes("문질")) topic = "골절 사고";
@@ -50,7 +52,7 @@ function generateHeadline(question: string, summary: string): string {
   else if (q.includes("수술")) topic = "수술비 담보";
   else if (q.includes("서류") || q.includes("청구")) topic = "보험금 청구 서류";
   else {
-    topic = question.length > 15 ? question.substring(0, 15) + "..." : question;
+    topic = correctedQuestion.length > 15 ? correctedQuestion.substring(0, 15) + "..." : correctedQuestion;
   }
 
   const s = summary.toLowerCase();
@@ -138,13 +140,33 @@ export async function POST(request: Request) {
 
     // 2. Query Gemini API with built-in Google Search Grounding tool
     const useWebSearch = process.env.ENABLE_OFFICIAL_WEB_SEARCH !== "false";
+    
+    // 공식 신뢰성 검증 도메인 화이트리스트 지정
+    const whitelistDomains = [
+      "disclosure.idbins.com",  // DB손해보험 공식 상품공시실
+      "idbins.com",             // DB손해보험 공식 사이트
+      "fss.or.kr",              // 금융감독원
+      "fsc.go.kr",              // 금융위원회
+      "knia.or.kr",             // 손해보험협회
+      "klia.or.kr",             // 생명보험협회
+      "korea.kr",               // 대한민국 정책브리핑
+      "law.go.kr",              // 국가법령정보센터
+      "kidi.or.kr",             // 보험개발원
+      "nhis.or.kr",             // 국민건강보험공단
+      "hira.or.kr"              // 건강보험심사평가원
+    ];
+    const searchOperator = whitelistDomains.map(dom => `site:${dom}`).join(" OR ");
+    const queryText = useWebSearch
+      ? `[PA 질문]\n${question}\n\n(참조 대상 제한: ${searchOperator})`
+      : `[PA 질문]\n${question}`;
+
     const requestBody = {
       contents: [
         {
           role: "user",
           parts: [
             {
-              text: `[PA 질문]\n${question}`
+              text: queryText
             }
           ]
         }
@@ -162,6 +184,17 @@ export async function POST(request: Request) {
 현재 시점 정보: ${currentDateString}
 
 [중요: 포맷 및 답변 지침]
+- **[매우 중요: 헤드라인 제목 생성 규칙]** 당신은 답변 본문을 작성하기에 앞서, **가장 첫 줄에 이 답변의 핵심 요지를 직관적으로 한눈에 설명해 줄 15자 내외의 세련된 제목을 반드시 다음 대괄호 형식으로 작성**하십시오. 질문에 STT 오타(예: '질비')가 섞여 있더라도, 제목에는 반드시 올바른 표준 보험 용어(예: '실비' 또는 '실손보험')로 교정하여 작성하십시오. 인트로/아웃트로 사설은 절대 쓰지 말고 오직 아래의 형식으로 즉시 시작하십시오.
+  * 형식: \`[제목: 4세대 및 5세대 실손보험 비교 분석]\`
+- **[매우 중요: 구글 검색 도구 사용 시 출처 및 쿼리 제약 조건]**
+  * 구글 실시간 검색 도구를 사용할 때, 신뢰할 수 있고 공인된 정보만을 수집하기 위해 반드시 다음의 도메인들만을 타겟팅하여 검색어(query)를 생성하거나 참조해야 합니다.
+    - 금융감독원/금융위원회: \`fss.or.kr\`, \`fsc.go.kr\`
+    - DB손해보험: \`idbins.com\`, \`disclosure.idbins.com\`
+    - 보험협회/개발원: \`knia.or.kr\`, \`klia.or.kr\`, \`kidi.or.kr\`
+    - 정부정책/법령: \`korea.kr\`, \`law.go.kr\`
+    - 보건의료 기관: \`nhis.or.kr\`, \`hira.or.kr\`
+  * 검색 쿼리에 반드시 \`site:도메인\`을 조합(예: \`site:fss.or.kr 5세대 실손의료비\`)하여 검색 범위를 엄격히 제약하십시오.
+  * 개인 블로그, 카페(네이버, 다음 등), 비공식 커뮤니티 및 일반 찌라시 언론 정보는 검색 결과에서 철저히 배제하고, 상기의 공식 도메인에서 조회된 정보만을 핵심적인 보장 판단 기준으로 삼으십시오.
 - 만약 사용자의 질문이 보험 업무, 약관, 고객 응대, 영업 지원과 전혀 무관한 일반적인 사담(예: 오늘 날씨, 일상 대화, 유머, 일반 상식, 인사 등)인 경우, [분석 배경 및 이해], [조건], [주의사항] 헤더를 모두 생략하고 오직 다음 한 문장의 텍스트만 출력하십시오: "저는 DB손해보험 PA 분들의 영업 활동을 돕는 인공지능 멘토 프로미입니다. 보험이나 영업 관련 질문을 입력해 주시겠어요?" (이 경우 구글 검색 도구를 호출하지 마십시오.)
 - 인사말이나 인트로 문구(예: "~이해하기 쉽게 정리해 드릴게요", "반갑습니다")와 아웃트로 사설은 불필요한 토큰 낭비이므로 **절대 쓰지 마십시오.** (단, 위의 보험 무관 질문에 대한 거절 답변은 제외)
 - 반드시 아래의 대괄호 헤더로 **즉시 본론부터 기재를 시작**하십시오.
@@ -356,11 +389,19 @@ export async function POST(request: Request) {
           console.log(`[Gemini Stream Done] fullText length: ${fullText.length}`);
           console.log(`[Gemini Stream Done] Raw groundingMetadata accumulated: ${JSON.stringify(groundingMetadata)}`);
 
-          // Extract citations from the full generated response
+          // Extract generated headline from the response text
+          const headlineRegex = /\[제목:\s*([\s\S]+?)\]/;
+          const headlineMatch = headlineRegex.exec(fullText);
+          const generatedHeadline = headlineMatch ? headlineMatch[1].trim() : generateHeadline(question, fullText);
+
+          // Clean response text by removing the headline markup
+          const textWithoutHeadline = fullText.replace(headlineRegex, "").trim();
+
+          // Extract citations from the clean response text
           const markdownCitations: Array<{ title: string; url: string }> = [];
           const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\s*\((https?:\/\/[^\)]+)\)/g;
           let match;
-          while ((match = citationRegex.exec(fullText)) !== null) {
+          while ((match = citationRegex.exec(textWithoutHeadline)) !== null) {
             markdownCitations.push({
               title: match[1].trim(),
               url: match[2].trim()
@@ -370,7 +411,7 @@ export async function POST(request: Request) {
           // Fallback: parse general markdown links [Title](URL) in case formatting differs
           const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
           let linkMatch;
-          while ((linkMatch = linkRegex.exec(fullText)) !== null) {
+          while ((linkMatch = linkRegex.exec(textWithoutHeadline)) !== null) {
             const title = linkMatch[1].trim();
             const url = linkMatch[2].trim();
             if (!markdownCitations.some(c => c.url === url) && !url.includes("kakaolink")) {
@@ -384,16 +425,49 @@ export async function POST(request: Request) {
           console.log(`[Gemini Stream Done] Extracted markdownCitations: ${JSON.stringify(markdownCitations)}`);
 
           let citations = [];
+          const getCitationSection = (uri: string): string => {
+            const lowUrl = uri.toLowerCase();
+            if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손보 공식";
+            if (lowUrl.includes("fss.or.kr") || lowUrl.includes("fsc.go.kr")) return "금융당국";
+            if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr") || lowUrl.includes("kidi.or.kr")) return "보험협회";
+            if (lowUrl.includes("korea.kr") || lowUrl.includes("law.go.kr")) return "정부/법령";
+            if (lowUrl.includes("nhis.or.kr") || lowUrl.includes("hira.or.kr")) return "보건의료";
+            return "웹 검색 정보";
+          };
+
+          const getCleanTitle = (title: string, url: string): string => {
+            const clean = title.trim();
+            const isDomainPattern = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:\d+)?$/.test(clean) || clean.toLowerCase().startsWith("http");
+            
+            if (!clean || isDomainPattern) {
+              const lowUrl = url.toLowerCase();
+              if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손해보험 공식 상품공시실 및 약관 정보";
+              if (lowUrl.includes("fss.or.kr") || lowUrl.includes("fsc.go.kr")) return "금융감독기관 공식 보험 보도 및 분쟁조정사례";
+              if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) return "손해/생명보험협회 표준약관 및 제도 안내";
+              if (lowUrl.includes("kidi.or.kr")) return "보험개발원 기술 분석 및 공시 가이드";
+              if (lowUrl.includes("korea.kr")) return "대한민국 정책브리핑 공식 보도자료";
+              if (lowUrl.includes("law.go.kr")) return "국가법령정보센터 관련 법령 및 판례";
+              if (lowUrl.includes("nhis.or.kr")) return "국민건강보험공단 급여/비급여 정책 가이드";
+              if (lowUrl.includes("hira.or.kr")) return "건강보험심사평가원 의료 수가 및 기준";
+              if (lowUrl.includes("signalplanner.co.kr")) return "시그널플래너 실손/수술비 보험 가이드 및 지급사례";
+              if (lowUrl.includes("kbthink.com")) return "KB손해보험 공식 지식 블로그 - 실손보험금 청구 기준";
+              if (lowUrl.includes("son4.net")) return "손사넷 손해사정사 전문 보상 분쟁 및 판례 해설";
+              if (lowUrl.includes("naver.com")) return "네이버 지식iN / 블로그 보험 보상 청구 가이드";
+              if (lowUrl.includes("tistory.com")) return "보상 실무 전문가 티스토리 블로그 정보";
+              if (lowUrl.includes("brunch.co.kr")) return "브런치 보험 전문 작가 칼럼 및 보상 리뷰";
+              
+              try {
+                const hostname = new URL(url).hostname.replace("www.", "");
+                return `${hostname} 전문 정보 및 해설`;
+              } catch {
+                return "실시간 검색 참조 자료";
+              }
+            }
+            return clean;
+          };
+
           if (markdownCitations.length > 0) {
             citations = markdownCitations.slice(0, 5).map((cit, i) => {
-              const getCitationSection = (uri: string): string => {
-                const lowUrl = uri.toLowerCase();
-                if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손보 공식";
-                if (lowUrl.includes("fss.or.kr")) return "금융감독원";
-                if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) return "보험협회";
-                if (lowUrl.includes("naver.com") || lowUrl.includes("tistory.com")) return "블로그/지식iN";
-                return "참고자료";
-              };
               return {
                 id: `citation-${i + 1}-${getUUIDShort()}`,
                 title: cit.title,
@@ -405,46 +479,10 @@ export async function POST(request: Request) {
               };
             });
           } else if (groundingMetadata) {
-            const getCleanTitle = (title: string, url: string): string => {
-              const clean = title.trim();
-              const isDomainPattern = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:\d+)?$/.test(clean) || clean.toLowerCase().startsWith("http");
-              
-              if (!clean || isDomainPattern) {
-                const lowUrl = url.toLowerCase();
-                if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손해보험 공식 상품공시실 및 약관 정보";
-                if (lowUrl.includes("fss.or.kr")) return "금융감독원 공식 보험분쟁 조정사례 및 규정";
-                if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) return "손해보험협회 표준약관 및 제도 안내";
-                if (lowUrl.includes("signalplanner.co.kr")) return "시그널플래너 실손/수술비 보험 가이드 및 지급사례";
-                if (lowUrl.includes("kbthink.com")) return "KB손해보험 공식 지식 블로그 - 실손보험금 청구 기준";
-                if (lowUrl.includes("son4.net")) return "손사넷 손해사정사 전문 보상 분쟁 및 판례 해설";
-                if (lowUrl.includes("naver.com")) return "네이버 지식iN / 블로그 보험 보상 청구 가이드";
-                if (lowUrl.includes("tistory.com")) return "보상 실무 전문가 티스토리 블로그 정보";
-                if (lowUrl.includes("brunch.co.kr")) return "브런치 보험 전문 작가 칼럼 및 보상 리뷰";
-                
-                try {
-                  const hostname = new URL(url).hostname.replace("www.", "");
-                  return `${hostname} 전문 정보 및 해설`;
-                } catch {
-                  return "실시간 검색 참조 자료";
-                }
-              }
-              return clean;
-            };
-
             const groundingChunks = groundingMetadata.groundingChunks || [];
             citations = groundingChunks.slice(0, 5).map((chunk: any, i: number) => {
               const web = chunk.web || {};
               const url = web.uri || "https://disclosure.idbins.com/";
-              
-              const getCitationSection = (uri: string): string => {
-                const lowUrl = uri.toLowerCase();
-                if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) return "DB손보 공식";
-                if (lowUrl.includes("fss.or.kr")) return "금융감독원";
-                if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr")) return "보험협회";
-                if (lowUrl.includes("naver.com") || lowUrl.includes("tistory.com")) return "블로그/지식iN";
-                return "참고자료";
-              };
-
               const resolvedTitle = getCleanTitle(web.title || "", url);
 
               return {
@@ -461,7 +499,7 @@ export async function POST(request: Request) {
 
           console.log(`[Gemini Stream Done] Final citations array (${citations.length} items): ${JSON.stringify(citations)}`);
 
-          const cleanResponseText = fullText.replace(citationRegex, "").trim();
+          const cleanResponseText = textWithoutHeadline.replace(citationRegex, "").trim();
           const isSimpleChat = cleanResponseText.length < 250 && !cleanResponseText.includes("[분석 배경 및 이해]") && !cleanResponseText.includes("[조건]");
 
           const usedEngine = modelName === "gemini-3.1-flash-lite"
@@ -473,7 +511,7 @@ export async function POST(request: Request) {
             searchEngine: usedEngine,
             modelName: modelName === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash-Lite" : "Gemini 2.5 Flash",
             citations,
-            headline: generateHeadline(question, cleanResponseText),
+            headline: generatedHeadline,
             requiredInfo: [
               "정확한 상품 명칭 및 약관 개정 버전",
               "가입 시기 및 청구 항목의 영수증/진단서",

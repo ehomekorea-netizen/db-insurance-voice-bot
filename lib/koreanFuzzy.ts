@@ -81,7 +81,8 @@ export const INSURANCE_GLOSSARY = [
   "수술비",
   "면책사항",
   "자기부담금",
-  "의료실비"
+  "의료실비",
+  "실비"
 ];
 
 /**
