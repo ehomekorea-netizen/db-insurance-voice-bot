@@ -39,6 +39,33 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 
 // Local database chunks lookup helper removed per client request to focus 100% on search grounding.
 
+function generateHeadline(question: string, summary: string): string {
+  const q = question.toLowerCase();
+  let topic = "";
+  if (q.includes("골절")) topic = "골절 진단비";
+  else if (q.includes("문질")) topic = "골절 사고";
+  else if (q.includes("도수")) topic = "도수치료 실손";
+  else if (q.includes("백내장") || q.includes("다초점")) topic = "백내장 수술비";
+  else if (q.includes("실손") || q.includes("실비")) topic = "실손 의료비";
+  else if (q.includes("수술")) topic = "수술비 담보";
+  else if (q.includes("서류") || q.includes("청구")) topic = "보험금 청구 서류";
+  else {
+    topic = question.length > 15 ? question.substring(0, 15) + "..." : question;
+  }
+
+  const s = summary.toLowerCase();
+  let action = "안내";
+  if (s.includes("제외") || s.includes("면책") || s.includes("보상하지 않")) {
+    action = "지급 제외 안내";
+  } else if (s.includes("지급") || s.includes("보장")) {
+    action = "지급 기준 및 조건";
+  } else if (s.includes("서류") || s.includes("준비")) {
+    action = "필수 구비 서류";
+  }
+
+  return `"${topic} ${action}"`;
+}
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as PolicyAnswerRequest & { userId?: string };
   let question = body.question?.trim();
@@ -444,6 +471,7 @@ export async function POST(request: Request) {
             searchEngine: usedEngine,
             modelName: modelName === "gemini-3.1-flash-lite" ? "Gemini 3.1 Flash-Lite" : "Gemini 2.5 Flash",
             citations,
+            headline: generateHeadline(question, cleanResponseText),
             requiredInfo: [
               "정확한 상품 명칭 및 약관 개정 버전",
               "가입 시기 및 청구 항목의 영수증/진단서",

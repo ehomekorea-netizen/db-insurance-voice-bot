@@ -72,6 +72,17 @@ function parseStreamedText(rawText: string) {
   };
 }
 
+function getFormattedTimeWithDay(date: Date = new Date()) {
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const dayName = days[date.getDay()];
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}. ${mm}. ${dd} (${dayName}) ${hh}:${min}`;
+}
+
 function generateUUID(): string {
   if (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID) {
     try {
@@ -1091,14 +1102,7 @@ export function VoiceCounselorApp() {
       
       tempMessageId = generateUUID();
       const now = new Date();
-      const formattedTime = now.toLocaleString("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      });
+      const formattedTime = getFormattedTimeWithDay(now);
 
       // Optimistically add an empty assistant card so we can stream into it
       setMessages((current) => [
@@ -1687,20 +1691,16 @@ function MessageBubble({
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
         <div className="card-top">
-          <div className="card-top-left">
-            <button className="model-pill-badge" disabled>
-              {ans.modelName || "Gemini 3.1 Flash-Lite"}
-            </button>
+          <div className="card-top-left" style={{ flex: 1, minWidth: 0, paddingRight: "8px" }}>
+            {ans.headline && (
+              <h3 className="card-headline-title" style={{ margin: 0, fontSize: "14.5px", fontWeight: "800", color: "var(--text-ink)", fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {ans.headline}
+              </h3>
+            )}
           </div>
-          <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
-              카톡 공유
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "4px" }}>
-                <path d="M12 2C6.48 2 2 5.52 2 10c0 2.75 1.68 5.16 4.25 6.43l-.84 3.12a.5.5 0 0 0 .73.54l3.66-2.03c.71.12 1.45.19 2.2.19 5.52 0 10-3.52 10-8s-4.48-8-10-8z"/>
-              </svg>
-            </button>
+          <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
             <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
-              {isZoomed ? "글씨 축소 🔍" : "글씨 확대 🔍"}
+              {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
             </button>
           </div>
         </div>
@@ -1837,7 +1837,7 @@ function MessageBubble({
               {ans.citations.map((citation) => (
                 <a
                   key={citation.id}
-                  href={citation.sourceUrl}
+                  href={`https://www.google.com/search?q=${encodeURIComponent(citation.title)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="citation-headline-link"
@@ -1865,9 +1865,15 @@ function MessageBubble({
           </footer>
         )}
 
-        <div className="card-timestamp" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#94a3b8", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "8px" }}>
+        <div className="card-bottom-actions" style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+          <button className="share-action-btn" onClick={() => onShare(ans)} title="공유하기">
+            공유 🔗
+          </button>
+        </div>
+
+        <div className="card-timestamp" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#94a3b8", marginTop: "8px" }}>
           <span>엔진: {ans.modelName || "Gemini 3.1 Flash-Lite"}</span>
-          <span>조회 시간: {message.timestamp || new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+          <span>조회 시간: {message.timestamp || getFormattedTimeWithDay(new Date())}</span>
         </div>
       </article>
     );

@@ -39,6 +39,7 @@ export type PolicyAnswer = {
   disclaimer: string;
   searchEngine?: string;
   modelName?: string;
+  headline?: string;
 };
 
 export const samplePolicyChunks: PolicyChunk[] = [
