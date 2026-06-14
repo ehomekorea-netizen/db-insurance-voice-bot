@@ -1185,9 +1185,9 @@ body {
 .citation-headline-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   text-decoration: none;
@@ -1201,7 +1201,7 @@ body {
   background-color: #ffffff;
   border-color: #3b82f6;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .citation-headline-link:hover .citation-title-text {
@@ -1211,17 +1211,17 @@ body {
 
 .citation-badge {
   display: inline-block;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
   background-color: #e0f2fe;
   color: #0369a1;
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 800;
   flex-shrink: 0;
 }
 
 .citation-title-text {
-  font-size: 14.5px;
+  font-size: 12.5px;
   font-weight: 650;
   color: #334155;
   overflow: hidden;
@@ -1233,6 +1233,8 @@ body {
 
 .citation-link-icon {
   color: #94a3b8;
+  width: 10px;
+  height: 10px;
   flex-shrink: 0;
   transition: color 0.2s ease;
 }
@@ -1372,27 +1374,29 @@ body {
 /* Share Action Button: Soft Coral Theme */
 .share-action-btn {
   background: #fff5f2 !important;
-  border: 1.5px solid #ffe4db !important;
+  border: 2px solid var(--text-ink) !important;
   color: #c2410c !important;
+  box-shadow: 2px 2px 0px var(--text-ink) !important;
 }
 
 .share-action-btn:hover {
   background: #ffebe6 !important;
-  border-color: #ffd0c1 !important;
-  color: #9a3412 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 3px 3px 0px var(--text-ink) !important;
 }
 
 /* Zoom Control: Soft Green Theme */
 .zoom-toggle-btn {
   background: #f0fdf4 !important;
-  border: 1.5px solid #dcfce7 !important;
+  border: 2px solid var(--text-ink) !important;
   color: #15803d !important;
+  box-shadow: 2px 2px 0px var(--text-ink) !important;
 }
 
 .zoom-toggle-btn:hover {
   background: #e8fded !important;
-  border-color: #bbf7d0 !important;
-  color: #166534 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 3px 3px 0px var(--text-ink) !important;
 }
 
 /* Model Pill Badge: Static Button Styling */

@@ -83,6 +83,31 @@ function getFormattedTimeWithDay(date: Date = new Date()) {
   return `${yyyy}. ${mm}. ${dd} (${dayName}) ${hh}:${min}`;
 }
 
+function getFallbackHeadline(q: string, s: string) {
+  const lowQ = q.toLowerCase();
+  let topic = "";
+  if (lowQ.includes("골절")) topic = "골절 진단비";
+  else if (lowQ.includes("문질")) topic = "골절 사고";
+  else if (lowQ.includes("도수")) topic = "도수치료 실손";
+  else if (lowQ.includes("백내장") || lowQ.includes("다초점")) topic = "백내장 수술비";
+  else if (lowQ.includes("실손") || lowQ.includes("실비")) topic = "실손 의료비";
+  else if (lowQ.includes("수술")) topic = "수술비 담보";
+  else if (lowQ.includes("서류") || lowQ.includes("청구")) topic = "보험금 청구 서류";
+  else {
+    topic = q.length > 15 ? q.substring(0, 15) + "..." : q;
+  }
+  const lowS = s.toLowerCase();
+  let action = "안내";
+  if (lowS.includes("제외") || lowS.includes("면책") || lowS.includes("보상하지 않")) {
+    action = "지급 제외 안내";
+  } else if (lowS.includes("지급") || lowS.includes("보장")) {
+    action = "지급 기준 및 조건";
+  } else if (lowS.includes("서류") || lowS.includes("준비")) {
+    action = "필수 구비 서류";
+  }
+  return `"${topic} ${action}"`;
+}
+
 function generateUUID(): string {
   if (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID) {
     try {
@@ -1209,6 +1234,7 @@ export function VoiceCounselorApp() {
         cautions: finalParsed.cautions,
         requiredInfo: metadata?.requiredInfo || [],
         citations: metadata?.citations || [],
+        headline: metadata?.headline || getFallbackHeadline(question, finalParsed.summary),
         searchEngine: metadata?.searchEngine || "실시간 스트리밍",
         modelName: metadata?.modelName || "Gemini 3.1 Flash-Lite",
         isSimpleChat: metadata?.isSimpleChat || false,
@@ -1865,15 +1891,13 @@ function MessageBubble({
           </footer>
         )}
 
-        <div className="card-bottom-actions" style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+        <div className="card-bottom-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", borderTop: "1.5px solid var(--text-ink)", paddingTop: "12px", gap: "12px" }}>
+          <span className="card-bottom-timestamp" style={{ fontSize: "11px", fontWeight: "800", color: "#000000" }}>
+            조회 시간: {message.timestamp || getFormattedTimeWithDay(new Date())}
+          </span>
           <button className="share-action-btn" onClick={() => onShare(ans)} title="공유하기">
             공유 🔗
           </button>
-        </div>
-
-        <div className="card-timestamp" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#94a3b8", marginTop: "8px" }}>
-          <span>엔진: {ans.modelName || "Gemini 3.1 Flash-Lite"}</span>
-          <span>조회 시간: {message.timestamp || getFormattedTimeWithDay(new Date())}</span>
         </div>
       </article>
     );
