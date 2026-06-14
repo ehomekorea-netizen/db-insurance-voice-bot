@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState, useEffect } from "react";
+import { FormEvent, Fragment, useMemo, useRef, useState, useEffect } from "react";
 import type { PolicyAnswer, PolicyIntent } from "@/lib/policyKnowledge";
 
 
@@ -998,8 +998,8 @@ export function VoiceCounselorApp() {
       resetInactivityTimer();
 
       // 5. Play welcome greeting
-      addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요?" });
-      await playStaticAudio("welcome.mp3", "PA님 무엇을 도와드릴까요?");
+      addMessage({ role: "assistant", content: "PA님 무엇을 도와드릴까요? 😊" });
+      await playStaticAudio("welcome.mp3", "PA님 무엇을 도와드릴까요? 😊");
 
       // Check if session was cancelled during greeting playback
       if (activeSessionIdRef.current !== currentSessionId) {
@@ -1544,9 +1544,48 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 
       {/* Messages */}
       <section className="messenger-chat-area">
-        {messages.map((message) => {
+        {messages.map((message, index) => {
+          if (message.id === "welcome") {
+            return (
+              <div key={message.id} className="message-wrapper system-wrapper">
+                <div className="bubble-wrapper" style={{ width: "100%", maxWidth: "100%" }}>
+                  <MessageBubble
+                    message={message}
+                    onShare={(ans) => handleShareText(ans)}
+                    kakaoUser={kakaoUser}
+                  />
+                </div>
+              </div>
+            );
+          }
+
           const isCollapsed = collapsedCardIds.has(message.id);
           const isCard = message.role === "assistant" && message.answer && !isCollapsed;
+
+          let showDateDivider = false;
+          let dateDividerText = "";
+
+          let prevRealMessage = null;
+          for (let i = index - 1; i >= 0; i--) {
+            if (messages[i].id !== "welcome") {
+              prevRealMessage = messages[i];
+              break;
+            }
+          }
+
+          const currentMsgDate = message.timestamp ? new Date(message.timestamp).toDateString() : new Date().toDateString();
+
+          if (!prevRealMessage) {
+            showDateDivider = true;
+            dateDividerText = getFormattedDateDivider(message.timestamp || new Date().toISOString());
+          } else {
+            const prevMsgDate = prevRealMessage.timestamp ? new Date(prevRealMessage.timestamp).toDateString() : new Date().toDateString();
+            if (currentMsgDate !== prevMsgDate) {
+              showDateDivider = true;
+              dateDividerText = getFormattedDateDivider(message.timestamp || new Date().toISOString());
+            }
+          }
+
           const wrapperClass =
             message.role === "user"
               ? "user-wrapper"
@@ -1555,36 +1594,61 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               : isCard
               ? "card-wrapper"
               : "assistant-wrapper";
+
+          const formattedTime = getFormattedTime(message.timestamp || new Date().toISOString());
+
           return (
-            <div key={message.id} className={`message-wrapper ${wrapperClass}`}>
-              {message.role === "assistant" && !isCard && (
-                <div className="avatar-wrapper">
-                  <img src="/promy.png" alt="PROMY" className="avatar-img" />
+            <Fragment key={message.id}>
+              {showDateDivider && (
+                <div className="chat-date-divider">
+                  <span>{dateDividerText}</span>
                 </div>
               )}
-              <div className="bubble-wrapper">
-                {message.role === "assistant" && !isCard && <span className="sender-name">동목포 오멘토</span>}
-                {message.role === "user" && <span className="sender-name">{kakaoUser?.nickname || "나"}</span>}
-                <MessageBubble
-                  message={message}
-                  onShare={(ans) => handleShareText(ans)}
-                  kakaoUser={kakaoUser}
-                  isCollapsed={isCollapsed}
-                  onToggleCollapse={() => toggleCardCollapse(message.id)}
-                />
+
+              <div className={`message-wrapper ${wrapperClass}`}>
+                {message.role === "user" && (
+                  <span className="chat-time-label user-time">
+                    {formattedTime}
+                  </span>
+                )}
+
+                {message.role === "assistant" && !isCard && (
+                  <div className="avatar-wrapper">
+                    <img src="/promy.png" alt="PROMY" className="avatar-img" />
+                  </div>
+                )}
+
+                <div className="bubble-wrapper">
+                  {message.role === "assistant" && !isCard && <span className="sender-name">동목포 오멘토</span>}
+                  {message.role === "user" && <span className="sender-name">{kakaoUser?.nickname || "나"}</span>}
+                  <MessageBubble
+                    message={message}
+                    onShare={(ans) => handleShareText(ans)}
+                    kakaoUser={kakaoUser}
+                    isCollapsed={isCollapsed}
+                    onToggleCollapse={() => toggleCardCollapse(message.id)}
+                  />
+                </div>
+
+                {message.role === "assistant" && (
+                  <span className="chat-time-label assistant-time">
+                    {formattedTime}
+                  </span>
+                )}
+
+                {message.role === "user" && (
+                  <div className="avatar-wrapper">
+                    {kakaoUser && kakaoUser.profileImage ? (
+                      <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
+                    ) : (
+                      <div className="user-avatar-circle">
+                        {kakaoUser ? kakaoUser.nickname.slice(0, 2) : "PA"}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {message.role === "user" && (
-                <div className="avatar-wrapper">
-                  {kakaoUser && kakaoUser.profileImage ? (
-                    <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
-                  ) : (
-                    <div className="user-avatar-circle">
-                      {kakaoUser ? kakaoUser.nickname.slice(0, 2) : "PA"}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            </Fragment>
           );
         })}
 
@@ -1749,9 +1813,19 @@ function MessageBubble({
   const [isClothespinHovered, setIsClothespinHovered] = useState(false);
 
   if (message.role === "assistant" && !message.answer) {
+    const isWelcomeText = message.content.includes("PA님 무엇을 도와드릴까요?");
+    let displayContent = message.content;
+    if (isWelcomeText && !displayContent.includes("😊")) {
+      displayContent = "PA님 무엇을 도와드릴까요? 😊";
+    }
     return (
-      <div className="message assistant-bubble">
-        {message.content}
+      <div 
+        className="message assistant-bubble" 
+        style={{ 
+          fontWeight: isWelcomeText ? "800" : "normal" 
+        }}
+      >
+        {displayContent}
       </div>
     );
   }
@@ -1778,7 +1852,14 @@ function MessageBubble({
             maxWidth: "100%"
           }}
         >
-          <span style={{ fontStyle: "italic", fontWeight: "800", fontSize: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ 
+            fontStyle: "italic", 
+            fontWeight: "800", 
+            fontSize: "13px", 
+            whiteSpace: "normal", 
+            wordBreak: "keep-all", 
+            overflowWrap: "break-word" 
+          }}>
             {quotedHeadline}
           </span>
           <button 
@@ -1804,7 +1885,7 @@ function MessageBubble({
 
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative" }}>
-        {/* Clothespin / Binder Clip fold button */}
+        {/* Fold Button - Downward Triangle */}
         <div 
           className="clothespin-btn" 
           onClick={onToggleCollapse}
@@ -1813,25 +1894,25 @@ function MessageBubble({
           title="답변 접기"
           style={{
             position: "absolute",
-            top: "-14px",
-            left: "18px",
-            width: "32px",
-            height: "32px",
-            backgroundColor: isClothespinHovered ? "#f87171" : "var(--accent-coral)",
-            border: "2.5px solid var(--text-ink)",
-            borderRadius: "6px",
+            top: "-10px",
+            left: "10px",
+            width: "22px",
+            height: "22px",
+            backgroundColor: isClothespinHovered ? "#245d55" : "var(--accent-green)",
+            border: "1.5px solid var(--text-ink)",
+            borderRadius: "4px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
-            boxShadow: isClothespinHovered ? "3px 3px 0px var(--text-ink)" : "2px 2px 0px var(--text-ink)",
-            transform: isClothespinHovered ? "scale(1.1) translateY(-2px)" : "none",
+            boxShadow: isClothespinHovered ? "2px 2px 0px var(--text-ink)" : "1.5px 1.5px 0px var(--text-ink)",
+            transform: isClothespinHovered ? "scale(1.05) translateY(-1px)" : "none",
             zIndex: 20,
             transition: "all 0.1s ease"
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "18px", height: "18px", stroke: "white" }}>
-            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: "10px", height: "10px", color: "white" }}>
+            <path d="M21 8H3l9 11z"/>
           </svg>
         </div>
 
@@ -2137,4 +2218,29 @@ function correctSttErrors(text: string): string {
     corrected = corrected.replace(new RegExp(key, "g"), value);
   }
   return corrected;
+}
+
+function getFormattedDateDivider(isoString: string): string {
+  try {
+    const date = new Date(isoString);
+    const days = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}`;
+  } catch {
+    return "";
+  }
+}
+
+function getFormattedTime(isoString: string): string {
+  try {
+    const date = new Date(isoString);
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "오후" : "오전";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const minutesStr = minutes < 10 ? "0" + minutes : minutes;
+    return `${ampm} ${hours}:${minutesStr}`;
+  } catch {
+    return "";
+  }
 }

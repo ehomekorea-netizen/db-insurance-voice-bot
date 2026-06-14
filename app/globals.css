@@ -356,14 +356,17 @@ body {
 
 .message-wrapper.card-wrapper {
   max-width: 100% !important;
-  width: calc(100% + 24px) !important;
-  margin-left: -12px !important;
-  margin-right: -12px !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   align-self: center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .message-wrapper.card-wrapper .bubble-wrapper {
-  max-width: 100% !important;
+  max-width: calc(100% - 44px) !important;
   width: 100% !important;
 }
 
@@ -938,13 +941,16 @@ body {
   
   .message-wrapper.card-wrapper {
     max-width: 100% !important;
-    width: calc(100% + 16px) !important;
-    margin-left: -8px !important;
-    margin-right: -8px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
   }
   
   .message-wrapper.card-wrapper .bubble-wrapper {
-    max-width: 100% !important;
+    max-width: calc(100% - 40px) !important;
     width: 100% !important;
   }
 
@@ -2177,5 +2183,42 @@ body {
     height: 16px !important;
     stroke-width: 2.2 !important;
   }
+}
+
+/* KakaoTalk-style Date Divider */
+.chat-date-divider {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+  width: 100%;
+}
+.chat-date-divider span {
+  background: rgba(32, 52, 58, 0.08);
+  color: var(--text-ink, #20343A);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 14px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nanum Gothic Round', 'Malgun Gothic', 'Pretendard', sans-serif;
+  letter-spacing: -0.2px;
+}
+
+/* KakaoTalk-style Time Labels */
+.chat-time-label {
+  font-size: 9px;
+  color: var(--text-secondary, #64748b);
+  align-self: flex-end;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  font-weight: 800;
+}
+.chat-time-label.user-time {
+  margin-right: 6px;
+}
+.chat-time-label.assistant-time {
+  margin-left: 6px;
 }
 
