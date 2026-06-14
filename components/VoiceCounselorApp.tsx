@@ -283,6 +283,19 @@ export function VoiceCounselorApp() {
   isMicMutedRef.current = isMicMuted;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [collapsedCardIds, setCollapsedCardIds] = useState<Set<string>>(new Set());
+
+  const toggleCardCollapse = (id: string) => {
+    setCollapsedCardIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -292,6 +305,15 @@ export function VoiceCounselorApp() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+          
+          // Collapse all historical cards by default on load
+          const historicalIds = new Set<string>();
+          parsed.forEach((msg: any) => {
+            if (msg.role === "assistant" && msg.answer) {
+              historicalIds.add(msg.id);
+            }
+          });
+          setCollapsedCardIds(historicalIds);
           return;
         }
       } catch (e) {
@@ -1521,7 +1543,8 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Messages */}
       <section className="messenger-chat-area">
         {messages.map((message) => {
-          const isCard = message.role === "assistant" && message.answer;
+          const isCollapsed = collapsedCardIds.has(message.id);
+          const isCard = message.role === "assistant" && message.answer && !isCollapsed;
           const wrapperClass =
             message.role === "user"
               ? "user-wrapper"
@@ -1544,6 +1567,8 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                   message={message}
                   onShare={(ans) => handleShareText(ans)}
                   kakaoUser={kakaoUser}
+                  isCollapsed={isCollapsed}
+                  onToggleCollapse={() => toggleCardCollapse(message.id)}
                 />
               </div>
               {message.role === "user" && (
@@ -1702,14 +1727,19 @@ function cleanListText(text: string | undefined): string {
 function MessageBubble({
   message,
   onShare,
-  kakaoUser
+  kakaoUser,
+  isCollapsed,
+  onToggleCollapse
 }: {
   message: ChatMessage;
   onShare: (ans: PolicyAnswer) => void;
   kakaoUser: { id: number; nickname: string; profileImage: string } | null;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isClothespinHovered, setIsClothespinHovered] = useState(false);
 
   if (message.role === "assistant" && !message.answer) {
     return (
@@ -1721,13 +1751,99 @@ function MessageBubble({
 
   if (message.role === "assistant" && message.answer) {
     const ans = message.answer;
+
+    if (isCollapsed) {
+      const quotedHeadline = ans.headline
+        ? (ans.headline.startsWith('"') ? ans.headline : `"${ans.headline}"`)
+        : `"${getFallbackHeadline(message.content, "")}"`;
+
+      return (
+        <div 
+          className="message assistant-bubble collapsed-bubble-content" 
+          onClick={onToggleCollapse}
+          style={{ 
+            cursor: "pointer", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between", 
+            gap: "12px",
+            width: "fit-content",
+            maxWidth: "100%"
+          }}
+        >
+          <span style={{ fontStyle: "italic", fontWeight: "800", fontSize: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {quotedHeadline}
+          </span>
+          <button 
+            className="expand-action-btn"
+            style={{
+              flexShrink: 0,
+              fontSize: "11px",
+              fontWeight: "900",
+              backgroundColor: "var(--highlight-yellow)",
+              border: "1.5px solid var(--text-ink)",
+              padding: "2px 8px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+              color: "var(--text-ink)"
+            }}
+          >
+            답변 펼치기 ▼
+          </button>
+        </div>
+      );
+    }
+
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`}>
+        {/* Clothespin / Binder Clip fold button */}
+        <div 
+          className="clothespin-btn" 
+          onClick={onToggleCollapse}
+          onMouseEnter={() => setIsClothespinHovered(true)}
+          onMouseLeave={() => setIsClothespinHovered(false)}
+          title="답변 접기"
+          style={{
+            position: "absolute",
+            top: "-14px",
+            left: "18px",
+            width: "32px",
+            height: "32px",
+            backgroundColor: isClothespinHovered ? "#f87171" : "var(--accent-coral)",
+            border: "2.5px solid var(--text-ink)",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            boxShadow: isClothespinHovered ? "3px 3px 0px var(--text-ink)" : "2px 2px 0px var(--text-ink)",
+            transform: isClothespinHovered ? "scale(1.1) translateY(-2px)" : "none",
+            zIndex: 20,
+            transition: "all 0.1s ease"
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "18px", height: "18px", stroke: "white" }}>
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </div>
+
         <div className="card-top" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", width: "100%", minHeight: "40px", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
-          <div style={{ flex: 1, textAlign: "center", paddingRight: "110px", paddingLeft: "10px" }}>
+          <div style={{ flex: 1, textAlign: "center", paddingRight: "110px", paddingLeft: "10px", display: "flex", justifyContent: "center" }}>
             {ans.headline && (
-              <h3 className="card-headline-title" style={{ margin: 0, fontSize: "17.5px", fontWeight: "900", color: "var(--text-ink)", fontStyle: "italic", lineHeight: "1.3" }}>
-                {ans.headline}
+              <h3 
+                className="card-headline-title" 
+                style={{ 
+                  margin: 0, 
+                  fontSize: ans.headline.length > 20 ? "13px" : ans.headline.length > 15 ? "15px" : "17.5px",
+                  fontWeight: "900", 
+                  color: "var(--text-ink)", 
+                  fontStyle: "italic", 
+                  lineHeight: "1.3",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {ans.headline.startsWith('"') ? ans.headline : `"${ans.headline}"`}
               </h3>
             )}
           </div>
