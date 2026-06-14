@@ -828,11 +828,11 @@ export function VoiceCounselorApp() {
 
       const data = await response.json();
       const transcribedText = (data.text || "").trim();
-      console.log("[VOICE] Whisper API response:", transcribedText);
+      console.log("[VOICE] Gemini STT API response:", transcribedText);
 
       // Filter out empty transcription
       if (!transcribedText) {
-        console.log("[VOICE] [Whisper STT Filter] Empty transcription, ignore.");
+        console.log("[VOICE] [Gemini STT Filter] Empty transcription, ignore.");
         setUserLiveTranscript("");
         isTranscribingRef.current = false;
         resetInactivityTimer();
@@ -1338,12 +1338,13 @@ export function VoiceCounselorApp() {
   }
 
   function addMessage(message: ChatMessageInput) {
+    const msgTimestamp = message.timestamp || new Date().toISOString();
     setMessages((current) => [
       ...current,
       {
         id: generateUUID(),
-        timestamp: new Date().toISOString(),
-        ...message
+        ...message,
+        timestamp: msgTimestamp
       } as ChatMessage
     ]);
   }
@@ -1916,7 +1917,7 @@ function MessageBubble({
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative" }}>
         <div className="card-top" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", width: "100%", minHeight: "40px", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
-          <div style={{ flex: 1, textAlign: "center", display: "flex", justifyContent: "center", paddingLeft: "40px", paddingRight: "40px" }}>
+          <div style={{ flex: 1, textAlign: "center", display: "flex", justifyContent: "center", paddingLeft: "90px", paddingRight: "90px" }}>
             {ans.headline && (
               <h3 
                 className="card-headline-title" 
@@ -1953,7 +1954,7 @@ function MessageBubble({
             >
               <div className="accordion-header-content">
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <svg viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{ width: "16px", height: "16px", marginRight: "2px" }}>
+                  <svg viewBox="0 0 24 24" fill="#ffea00" stroke="#b45309" strokeWidth="2" style={{ width: "16px", height: "16px", marginRight: "2px" }}>
                     <path d="M9 21h6v-1.3c0-.4.2-.7.5-1A8 8 0 1 0 8 10c0 2.2.9 4.2 2.5 5.7.3.3.5.6.5 1V21z" strokeLinecap="round" strokeLinejoin="round" />
                     <line x1="9" y1="18" x2="15" y2="18" strokeLinecap="round" strokeLinejoin="round" />
                     <line x1="10" y1="15" x2="14" y2="15" strokeLinecap="round" strokeLinejoin="round" />
@@ -1962,9 +1963,9 @@ function MessageBubble({
                 </div>
                 <span className="accordion-toggle-tag">
                   {isExpanded ? (
-                    <>내용접기<span style={{ color: "var(--accent-green)", marginLeft: "2px" }}>▲</span></>
+                    <>내용접기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▲</span></>
                   ) : (
-                    <>내용열기<span style={{ color: "var(--accent-green)", marginLeft: "2px" }}>▼</span></>
+                    <>내용열기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▼</span></>
                   )}
                 </span>
               </div>
@@ -2280,8 +2281,10 @@ function getFormattedTime(isoString?: string): string {
   }
 }
 
+const stableFallbackDate = new Date();
+
 function parseSafeDate(dateStr?: string): Date {
-  if (!dateStr) return new Date();
+  if (!dateStr) return stableFallbackDate;
   
   let formatted = dateStr;
   if (typeof dateStr === "string" && !dateStr.includes("T")) {
@@ -2293,5 +2296,5 @@ function parseSafeDate(dateStr?: string): Date {
     return parsed;
   }
   
-  return new Date();
+  return stableFallbackDate;
 }

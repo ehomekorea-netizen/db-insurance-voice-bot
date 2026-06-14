@@ -291,7 +291,7 @@ export async function getUserChatLogs(userId: string): Promise<ChatLogEntry[]> {
           userId: fields.userId?.stringValue || "",
           role: (fields.role?.stringValue || "user") as "user" | "assistant",
           content: fields.content?.stringValue || "",
-          timestamp: fields.timestamp?.stringValue || new Date().toISOString()
+          timestamp: fields.timestamp?.stringValue || doc.createTime || new Date().toISOString()
         });
       }
     }
