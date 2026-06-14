@@ -521,8 +521,22 @@ export async function POST(request: Request) {
 
           // Accumulate Gemini Cost (USD/KRW converted with rate 1,400₩/$1)
           if (userId && (promptTokenCount > 0 || candidatesTokenCount > 0)) {
-            const inputCost = promptTokenCount * 0.000105; // $0.075 / 1M tokens * 1400₩
-            const outputCost = candidatesTokenCount * 0.00042; // $0.30 / 1M tokens * 1400₩
+            // gemini-3.1-flash-lite: $0.25/1M input, $1.50/1M output
+            // gemini-2.5-flash: $0.30/1M input, $2.50/1M output
+            // gemini-2.0-flash-lite / gemini-1.5-flash: $0.075/1M input, $0.30/1M output
+            let inputRate = 0.00035; // default gemini-3.1-flash-lite ($0.25/1M * 1400₩)
+            let outputRate = 0.0021; // default gemini-3.1-flash-lite ($1.50/1M * 1400₩)
+
+            if (modelName === "gemini-2.5-flash") {
+              inputRate = 0.00042;   // $0.30/1M * 1400₩
+              outputRate = 0.0035;   // $2.50/1M * 1400₩
+            } else if (modelName === "gemini-2.0-flash-lite" || modelName === "gemini-1.5-flash") {
+              inputRate = 0.000105;  // $0.075/1M * 1400₩
+              outputRate = 0.00042;  // $0.30/1M * 1400₩
+            }
+
+            const inputCost = promptTokenCount * inputRate;
+            const outputCost = candidatesTokenCount * outputRate;
             const totalCost = inputCost + outputCost;
             try {
               // Dynamic import to prevent initialisation timing race conditions in Edge Runtime
