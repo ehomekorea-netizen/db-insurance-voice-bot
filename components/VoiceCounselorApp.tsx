@@ -1629,13 +1629,20 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 }
 
 // Helper to parse double asterisks (e.g. **bold**) and markdown links [text](url) and render them as JSX with styling
-function renderFormattedText(text: string | undefined) {
+function renderFormattedText(text: string | undefined, isSimple: boolean = false) {
   if (!text) return null;
   const regex = /(\*\*[^*]+\*\*|\[[^\]]+\]\s*\(\s*https?:\/\/[^\s\)]+\s*\))/g;
   const parts = text.split(regex);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       const cleanText = part.slice(2, -2);
+      if (isSimple) {
+        return (
+          <strong key={index} style={{ fontWeight: "800", color: "#000000" }}>
+            {cleanText}
+          </strong>
+        );
+      }
       return (
         <strong
           key={index}
@@ -1742,14 +1749,9 @@ function MessageBubble({
               title="클릭하여 분석 근거 상세 보기"
             >
               <div className="accordion-header-content">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="icon-badge badge-analysis">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                  </span>
-                  <span style={{ fontWeight: "800" }}>질문 이해 및 분석근거</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "14px", marginRight: "2px" }}>💡</span>
+                  <span style={{ fontWeight: "700", fontSize: "12.5px", color: "var(--text-ink)" }}>질문 이해 및 분석근거</span>
                 </div>
                 <span className="accordion-toggle-tag">
                   {isExpanded ? "내용접기▲" : "내용열기▼"}
@@ -1779,7 +1781,7 @@ function MessageBubble({
               핵심 답변 요약
             </h4>
             <p className="summary-text" style={{ lineHeight: "1.6", color: "#0f172a", fontWeight: "500" }}>
-              {renderFormattedText(ans.summary)}
+              {renderFormattedText(ans.summary, true)}
             </p>
           </div>
         )}
