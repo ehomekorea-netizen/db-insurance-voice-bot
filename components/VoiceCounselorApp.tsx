@@ -1688,26 +1688,13 @@ function MessageBubble({
           </div>
           <div className="card-top-actions" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button className="share-action-btn" onClick={() => onShare(ans)} title="카카오톡으로 리포트 공유">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "2px" }}>
+              카톡 공유
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "4px" }}>
                 <path d="M12 2C6.48 2 2 5.52 2 10c0 2.75 1.68 5.16 4.25 6.43l-.84 3.12a.5.5 0 0 0 .73.54l3.66-2.03c.71.12 1.45.19 2.2.19 5.52 0 10-3.52 10-8s-4.48-8-10-8z"/>
               </svg>
-              카톡 공유
             </button>
-            <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소" style={{
-              fontSize: "10px",
-              fontWeight: "700",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "6px",
-              padding: "4px 8px",
-              cursor: "pointer",
-              color: "#2563eb",
-              transition: "all 0.2s ease",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "2px"
-            }}>
-              {isZoomed ? "글씨 🔍-" : "글씨 🔍+"}
+            <button className="zoom-toggle-btn" onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
+              {isZoomed ? "글씨 축소 🔍" : "글씨 확대 🔍"}
             </button>
           </div>
         </div>
