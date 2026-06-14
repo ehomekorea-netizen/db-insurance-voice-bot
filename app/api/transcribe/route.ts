@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 
 export const runtime = "nodejs";
 
@@ -12,46 +11,86 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey || geminiKey === "your-gemini-api-key-here" || geminiKey.trim() === "") {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY is not configured on the server." },
+        { error: "GEMINI_API_KEY is not configured on the server." },
         { status: 500 }
       );
     }
 
-    const openai = new OpenAI({ apiKey });
+    // Convert the audio file to Base64
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const base64Data = buffer.toString("base64");
+    const mimeType = file.type || "audio/webm";
 
-    // Call OpenAI Whisper API to transcribe the audio file
-    const transcription = await openai.audio.transcriptions.create({
-      file: file,
-      model: "whisper-1",
-      language: "ko",
-      prompt: "이 대화는 DB손해보험 PA(설계사)의 영업 활동을 지원하는 인공지능 멘토 '프로미'와의 음성 대화입니다. 보험 약관, 고객 응대, 영업 지원, 상품 설명 등 보험 업무 전반에 관한 질문과 답변이 주를 이룹니다. 질문하는 어조인 경우에는 문장 끝에 물음표(?)를 정확하게 붙여 전사하고, '알려줘', '설명해줘', '알려주세요'와 같이 요청하는 경우에는 문장 끝에 느낌표(!) 또는 마침표(.)를 문맥에 맞게 표기해 주세요. 기침 소리, 한숨 소리, '어', '음', '아', '네' 등의 무의미한 잡음이나 단순 감탄사는 받아쓰지 마세요.",
+    // Call Gemini API with the audio file inline
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${geminiKey}`;
+    
+    const promptText = "이 대화는 DB손해보험 PA(설계사)의 영업 활동을 지원하는 인공지능 멘토 '프로미'와의 음성 대화입니다. 보험 약관, 고객 응대, 영업 지원, 상품 설명 등 보험 업무 전반에 관한 질문과 답변이 주를 이룹니다. 질문하는 어조인 경우에는 문장 끝에 물음표(?)를 정확하게 붙여 전사하고, '알려줘', '설명해줘', '알려주세요'와 같이 요청하는 경우에는 문장 끝에 느낌표(!) 또는 마침표(.)를 문맥에 맞게 표기해 주세요. 기침 소리, 한숨 소리, '어', '음', '아', '네' 등의 무의미한 잡음이나 단순 감탄사는 받아쓰지 마세요. 오직 오디오 파일에서 사용자가 말한 한국어 음성만을 텍스트로 정확하게 받아쓰기(전사)하여 출력하세요. 아무런 설명이나 부연 설명 없이 오직 받아쓴 한글 텍스트만 그대로 출력해 주세요.";
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
+            },
+            {
+              text: promptText
+            }
+          ]
+        }
+      ]
+    };
+
+    const res = await fetch(geminiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
     });
 
-    const duration = formData.get("duration") as string;
-    const userId = formData.get("userId") as string;
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini STT API Error (HTTP ${res.status}): ${errText}`);
+    }
 
-    const durationSec = duration ? Math.max(0, parseInt(duration, 10)) : 0;
-    const cost = durationSec * 0.14; // $0.006 / 60s * 1400₩ = 0.14₩ per second
+    const resJson = await res.json();
+    const transcribedText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    const usage = resJson.usageMetadata || {};
+    const promptTokenCount = usage.promptTokenCount || 0;
+    const candidatesTokenCount = usage.candidatesTokenCount || 0;
+
+    // gemini-3.1-flash-lite pricing: $0.25/1M input, $1.50/1M output * 1400₩
+    const inputCost = promptTokenCount * 0.00035;
+    const outputCost = candidatesTokenCount * 0.0021;
+    const cost = inputCost + outputCost;
+
+    const userId = formData.get("userId") as string;
 
     if (userId && cost > 0) {
       try {
         const { incrementUserCost } = await import("@/lib/firebase");
-        await incrementUserCost(userId, "whisper", cost);
-        console.log(`[Whisper Cost Log] Added ₩${cost.toFixed(3)} (Sec: ${durationSec}) to user ${userId}`);
+        // Update user's geminiCost field since we are now using Gemini for STT!
+        await incrementUserCost(userId, "gemini", cost);
+        console.log(`[Gemini STT Cost Log] Added ₩${cost.toFixed(4)} (Tokens: ${promptTokenCount}/${candidatesTokenCount}) to user ${userId}`);
       } catch (dbErr) {
-        console.error("[Whisper Cost Log] Failed to update user cost:", dbErr);
+        console.error("[Gemini STT Cost Log] Failed to update user cost:", dbErr);
       }
     }
 
-    const rawText = transcription.text || "";
+    const rawText = transcribedText.trim();
     const processedText = appendPunctuationByContext(rawText);
 
     return NextResponse.json({ text: processedText });
   } catch (err: any) {
-    console.error("OpenAI Whisper Transcription failed:", err);
+    console.error("Gemini STT Transcription failed:", err);
     return NextResponse.json(
       { error: "Transcription failed", detail: err.message || err },
       { status: 500 }

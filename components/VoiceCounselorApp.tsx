@@ -304,11 +304,16 @@ export function VoiceCounselorApp() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
+          // Ensure all loaded historical messages have a valid timestamp property so they don't dynamically sync to the current time
+          const validated = parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp || new Date().toISOString()
+          }));
+          setMessages(validated);
           
           // Collapse all historical cards by default on load
           const historicalIds = new Set<string>();
-          parsed.forEach((msg: any) => {
+          validated.forEach((msg: any) => {
             if (msg.role === "assistant" && msg.answer) {
               historicalIds.add(msg.id);
             }
@@ -325,7 +330,8 @@ export function VoiceCounselorApp() {
         id: "welcome",
         role: "system",
         content:
-          "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+          "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다.",
+        timestamp: new Date().toISOString()
       }
     ]);
   }, []);
@@ -354,7 +360,8 @@ export function VoiceCounselorApp() {
           id: "welcome",
           role: "system",
           content:
-            "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다."
+            "반갑습니다. DB손해보험 동목포 오멘토입니다. PA님 무엇을 도와드릴까요? 우측 상단의 [도움요청 🎙️] 버튼을 누르시면 음성 상담을 시작하실 수 있습니다.",
+          timestamp: new Date().toISOString()
         }
       ]);
     }
@@ -1613,7 +1620,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 )}
 
                 <div className="bubble-wrapper" style={{ width: isCard ? "100%" : "auto" }}>
-                  {message.role === "assistant" && !isCard && (
+                  {message.role === "assistant" && (
                     isCollapsed ? (
                       <div style={{ display: "flex", marginBottom: "-6px", zIndex: 5, paddingLeft: "2px" }}>
                         <button 
@@ -1632,6 +1639,26 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                           }}
                         >
                           답변 펼치기 ▼
+                        </button>
+                      </div>
+                    ) : isCard ? (
+                      <div style={{ display: "flex", marginBottom: "-6px", zIndex: 5, paddingLeft: "2px" }}>
+                        <button 
+                          className="expand-action-btn"
+                          onClick={() => toggleCardCollapse(message.id)}
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "950",
+                            backgroundColor: "var(--accent-green)",
+                            border: "1.5px solid var(--text-ink)",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+                            color: "white"
+                          }}
+                        >
+                          답변 접기 ▲
                         </button>
                       </div>
                     ) : (
@@ -1888,39 +1915,8 @@ function MessageBubble({
 
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative" }}>
-        {/* Fold Button - Downward Triangle */}
-        <div 
-          className="clothespin-btn" 
-          onClick={onToggleCollapse}
-          onMouseEnter={() => setIsClothespinHovered(true)}
-          onMouseLeave={() => setIsClothespinHovered(false)}
-          title="답변 접기"
-          style={{
-            position: "absolute",
-            top: "-10px",
-            left: "10px",
-            width: "22px",
-            height: "22px",
-            backgroundColor: isClothespinHovered ? "#245d55" : "var(--accent-green)",
-            border: "1.5px solid var(--text-ink)",
-            borderRadius: "4px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            boxShadow: isClothespinHovered ? "2px 2px 0px var(--text-ink)" : "1.5px 1.5px 0px var(--text-ink)",
-            transform: isClothespinHovered ? "scale(1.05) translateY(-1px)" : "none",
-            zIndex: 20,
-            transition: "all 0.1s ease"
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: "10px", height: "10px", color: "white" }}>
-            <path d="M21 8H3l9 11z"/>
-          </svg>
-        </div>
-
         <div className="card-top" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center", width: "100%", minHeight: "40px", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
-          <div style={{ flex: 1, textAlign: "center", paddingRight: "110px", paddingLeft: "10px", display: "flex", justifyContent: "center" }}>
+          <div style={{ flex: 1, textAlign: "center", display: "flex", justifyContent: "center", paddingLeft: "40px", paddingRight: "40px" }}>
             {ans.headline && (
               <h3 
                 className="card-headline-title" 
@@ -1957,11 +1953,19 @@ function MessageBubble({
             >
               <div className="accordion-header-content">
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "14px", marginRight: "2px" }}>💡</span>
+                  <svg viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{ width: "16px", height: "16px", marginRight: "2px" }}>
+                    <path d="M9 21h6v-1.3c0-.4.2-.7.5-1A8 8 0 1 0 8 10c0 2.2.9 4.2 2.5 5.7.3.3.5.6.5 1V21z" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="9" y1="18" x2="15" y2="18" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="10" y1="15" x2="14" y2="15" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <span style={{ fontWeight: "700", fontSize: "12.5px", color: "var(--text-ink)" }}>질문 이해 및 분석근거</span>
                 </div>
                 <span className="accordion-toggle-tag">
-                  {isExpanded ? "내용접기▲" : "내용열기▼"}
+                  {isExpanded ? (
+                    <>내용접기<span style={{ color: "var(--accent-green)", marginLeft: "2px" }}>▲</span></>
+                  ) : (
+                    <>내용열기<span style={{ color: "var(--accent-green)", marginLeft: "2px" }}>▼</span></>
+                  )}
                 </span>
               </div>
             </h4>
