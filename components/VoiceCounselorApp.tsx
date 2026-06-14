@@ -1573,13 +1573,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             }
           }
 
-          const currentMsgDate = message.timestamp ? new Date(message.timestamp).toDateString() : new Date().toDateString();
+          const currentMsgDate = parseSafeDate(message.timestamp).toDateString();
 
           if (!prevRealMessage) {
             showDateDivider = true;
             dateDividerText = getFormattedDateDivider(message.timestamp || new Date().toISOString());
           } else {
-            const prevMsgDate = prevRealMessage.timestamp ? new Date(prevRealMessage.timestamp).toDateString() : new Date().toDateString();
+            const prevMsgDate = parseSafeDate(prevRealMessage.timestamp).toDateString();
             if (currentMsgDate !== prevMsgDate) {
               showDateDivider = true;
               dateDividerText = getFormattedDateDivider(message.timestamp || new Date().toISOString());
@@ -1613,7 +1613,31 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 )}
 
                 <div className="bubble-wrapper" style={{ width: isCard ? "100%" : "auto" }}>
-                  {message.role === "assistant" && !isCard && <span className="sender-name">오멘토</span>}
+                  {message.role === "assistant" && !isCard && (
+                    isCollapsed ? (
+                      <div style={{ display: "flex", marginBottom: "-6px", zIndex: 5, paddingLeft: "2px" }}>
+                        <button 
+                          className="expand-action-btn"
+                          onClick={() => toggleCardCollapse(message.id)}
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "950",
+                            backgroundColor: "var(--highlight-yellow)",
+                            border: "1.5px solid var(--text-ink)",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+                            color: "var(--text-ink)"
+                          }}
+                        >
+                          답변 펼치기 ▼
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="sender-name">오멘토</span>
+                    )
+                  )}
                   <MessageBubble
                     message={message}
                     onShare={(ans) => handleShareText(ans)}
@@ -1839,9 +1863,10 @@ function MessageBubble({
             display: "flex", 
             flexDirection: "column",
             alignItems: "stretch", 
-            gap: "8px",
             width: "100%",
-            maxWidth: "100%"
+            maxWidth: "100%",
+            paddingTop: "12px",
+            paddingBottom: "8px"
           }}
         >
           <span style={{ 
@@ -1852,28 +1877,11 @@ function MessageBubble({
             wordBreak: "keep-all", 
             overflowWrap: "break-word",
             display: "block",
-            color: "var(--text-ink)"
+            color: "var(--text-ink)",
+            textAlign: "center"
           }}>
             {quotedHeadline}
           </span>
-          <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
-            <button 
-              className="expand-action-btn"
-              style={{
-                fontSize: "11px",
-                fontWeight: "900",
-                backgroundColor: "var(--highlight-yellow)",
-                border: "1.5px solid var(--text-ink)",
-                padding: "2px 8px",
-                borderRadius: "6px",
-                cursor: "pointer",
-                boxShadow: "1.5px 1.5px 0px var(--text-ink)",
-                color: "var(--text-ink)"
-              }}
-            >
-              답변 펼치기 ▼
-            </button>
-          </div>
         </div>
       );
     }
@@ -2099,10 +2107,10 @@ function MessageBubble({
           title="공유하기"
           style={{
             position: "absolute",
-            bottom: "-10px",
-            right: "10px",
-            width: "22px",
-            height: "22px",
+            bottom: "-12px",
+            right: "12px",
+            width: "28px",
+            height: "28px",
             backgroundColor: isShareHovered ? "#245d55" : "var(--accent-green)",
             border: "1.5px solid var(--text-ink)",
             borderRadius: "4px",
@@ -2116,7 +2124,7 @@ function MessageBubble({
             transition: "all 0.1s ease"
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "11px", height: "11px", stroke: "white" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "14px", height: "14px", stroke: "white" }}>
             <circle cx="18" cy="5" r="3"/>
             <circle cx="6" cy="12" r="3"/>
             <circle cx="18" cy="19" r="3"/>

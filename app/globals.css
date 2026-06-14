@@ -808,6 +808,8 @@ body {
 .card-disclaimer {
   border-top: 1px solid var(--panel-border);
   padding-top: 6px;
+  margin-top: -8px; /* Pull closer to the last content section to reduce whitespace */
+  padding-right: 36px; /* Avoid overlap with absolute floating share button */
   font-size: 9.5px;
   color: var(--text-muted);
   line-height: 1.3;
@@ -2215,5 +2217,8 @@ body {
 .chat-time-label.assistant-time {
   align-self: flex-end;
   margin-top: 4px;
+}
+.card-wrapper .chat-time-label.assistant-time {
+  margin-right: 48px; /* Shift timestamp left to prevent overlap with floating share button */
 }
 
