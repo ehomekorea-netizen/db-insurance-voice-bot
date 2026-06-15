@@ -131,6 +131,7 @@ export function VoiceCounselorApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [kakaoUser, setKakaoUser] = useState<{ id: number; nickname: string; profileImage: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isSettingOpen, setIsSettingOpen] = useState(false);
 
   // Easter Egg to Admin Page
   const [logoClicks, setLogoClicks] = useState(0);
@@ -1599,8 +1600,8 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       <main className="messenger-shell">
       {/* Header */}
       <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px" }}>
-        {/* Left Section: Profile Favicon + Logout + Trash */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 0%", minWidth: 0 }}>
+        {/* Left Section: Profile Favicon + Nickname + Setting Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: isConnected ? "1.2 1 0%" : "1 1 0%", minWidth: 0 }}>
           {kakaoUser && kakaoUser.profileImage ? (
             <img src={kakaoUser.profileImage} alt="" className="avatar-img" style={{ flexShrink: 0 }} />
           ) : (
@@ -1610,41 +1611,32 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               </svg>
             </div>
           )}
-          {isLoggedIn && (
-            <button className="logout-btn" onClick={handleLogout} title="로그아웃" style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", flexShrink: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-            </button>
-          )}
-          {messages.length > 1 && (
-            <button className="clear-chat-btn" onClick={clearChatHistory} title="대화 기록 전체 삭제" style={{
-              background: "transparent",
-              border: "none",
-              color: "#94a3b8",
-              cursor: "pointer",
-              padding: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "50%",
-              transition: "background-color 0.2s",
-              flexShrink: 0
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px", minWidth: 0 }}>
+            <span style={{ 
+              fontSize: "12.5px", 
+              fontWeight: "900", 
+              color: "var(--text-ink)", 
+              whiteSpace: "nowrap", 
+              overflow: "hidden", 
+              textOverflow: "ellipsis",
+              maxWidth: "100px"
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
-            </button>
-          )}
+              {kakaoUser ? formatNicknamePA(kakaoUser.nickname) : "PA님"}
+            </span>
+            {isLoggedIn && (
+              <button 
+                className="setting-small-btn"
+                onClick={() => setIsSettingOpen(true)}
+                title="설정"
+              >
+                설정
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Center Section: Status Indicator Badge */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: "0 0 auto", zIndex: 5 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px" }}>
           <div className="messenger-status-row" style={{ margin: 0 }}>
             <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
@@ -1658,7 +1650,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Right Section: Help Request Button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "1 1 0%" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: isConnected ? "0.8 1 0%" : "1 1 0%" }}>
           {!isConnected && !isConnecting ? (
             <button className="primary-button help-request-btn" onClick={startRealtime}>
               도움요청 🎙️
@@ -1749,14 +1741,14 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                           className="expand-action-btn"
                           onClick={() => toggleCardCollapse(message.id)}
                           style={{
-                            fontSize: "11px",
+                            fontSize: "13px",
                             fontWeight: "950",
                             backgroundColor: "var(--highlight-yellow)",
-                            border: "1.5px solid var(--text-ink)",
-                            padding: "2px 8px",
+                            border: "2px solid var(--text-ink)",
+                            padding: "4px 12px",
                             borderRadius: "6px",
                             cursor: "pointer",
-                            boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+                            boxShadow: "2px 2px 0px var(--text-ink)",
                             color: "var(--text-ink)"
                           }}
                         >
@@ -1769,14 +1761,14 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                           className="expand-action-btn"
                           onClick={() => toggleCardCollapse(message.id)}
                           style={{
-                            fontSize: "11px",
+                            fontSize: "13px",
                             fontWeight: "950",
                             backgroundColor: "var(--accent-green)",
-                            border: "1.5px solid var(--text-ink)",
-                            padding: "2px 8px",
+                            border: "2px solid var(--text-ink)",
+                            padding: "4px 12px",
                             borderRadius: "6px",
                             cursor: "pointer",
-                            boxShadow: "1.5px 1.5px 0px var(--text-ink)",
+                            boxShadow: "2px 2px 0px var(--text-ink)",
                             color: "white"
                           }}
                         >
@@ -1879,6 +1871,50 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         <div ref={messagesEndRef} />
       </section>
     </main>
+
+    {/* Settings Modal Popup */}
+    {isSettingOpen && (
+      <div className="settings-modal-overlay" onClick={() => setIsSettingOpen(false)}>
+        <div className="settings-modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="settings-modal-header">
+            <span className="settings-modal-title">설정</span>
+            <button className="settings-modal-close" onClick={() => setIsSettingOpen(false)}>×</button>
+          </div>
+          <div className="settings-modal-body">
+            <button 
+              className="settings-action-btn clear-history" 
+              onClick={() => {
+                setIsSettingOpen(false);
+                clearChatHistory();
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+              대화기록삭제
+            </button>
+            
+            <button 
+              className="settings-action-btn logout" 
+              onClick={() => {
+                setIsSettingOpen(false);
+                handleLogout();
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              로그아웃
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </>
   );
 }

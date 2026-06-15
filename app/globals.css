@@ -683,6 +683,7 @@ body {
   font-weight: 800 !important;
   margin: 0 !important;
   box-shadow: none !important;
+  text-decoration: underline !important;
 }
 
 .analysis-text {
@@ -1402,21 +1403,27 @@ body {
 
 /* Zoom Control: Tactile Yellow & Black */
 .zoom-toggle-btn {
-  background: #facc15 !important;
+  background: #fef08a !important;
   border: 2px solid #000000 !important;
   color: #000000 !important;
   box-shadow: 2px 2px 0px #000000 !important;
+  width: 90px !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  white-space: nowrap !important;
 }
 
 .zoom-toggle-btn:hover {
-  background: #eab308 !important;
+  background: #fef08a !important;
   transform: translateY(-1px) !important;
   box-shadow: 3px 3px 0px #000000 !important;
 }
 
 .zoom-toggle-btn:focus,
 .zoom-toggle-btn:active {
-  background: #facc15 !important;
+  background: #fef08a !important;
   outline: none !important;
 }
 
@@ -2248,5 +2255,154 @@ body {
 }
 .card-wrapper .chat-time-label.assistant-time {
   margin-right: 80px; /* Shift timestamp left to prevent overlap with floating share button containing '공유' text */
+}
+
+/* 설정 버튼 스타일 */
+.setting-small-btn {
+  background-color: var(--accent-green) !important;
+  color: #ffffff !important;
+  border: 1.5px solid var(--text-ink) !important;
+  border-radius: 4px !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  box-shadow: 1.5px 1.5px 0px var(--text-ink) !important;
+  cursor: pointer !important;
+  transition: transform 0.1s, box-shadow 0.1s !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+}
+.setting-small-btn:hover {
+  background-color: #245d55 !important;
+  transform: translate(-0.5px, -0.5px) !important;
+  box-shadow: 2px 2px 0px var(--text-ink) !important;
+}
+.setting-small-btn:active {
+  transform: translate(0.5px, 0.5px) !important;
+  box-shadow: 0.5px 0.5px 0px var(--text-ink) !important;
+}
+
+/* 설정 모달 팝업 스타일 */
+.settings-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(32, 52, 58, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fade-in-overlay 0.2s ease-out;
+}
+
+.settings-modal-container {
+  background-color: #ffffff;
+  border: 3px solid var(--text-ink);
+  box-shadow: 6px 6px 0px var(--text-ink);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 340px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: scale-up-modal 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  box-sizing: border-box;
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--text-ink);
+  padding-bottom: 10px;
+}
+
+.settings-modal-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-ink);
+}
+
+.settings-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  color: var(--text-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  line-height: 1;
+}
+
+.settings-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.settings-action-btn {
+  width: 100%;
+  height: 42px;
+  border: 2px solid var(--text-ink);
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 850;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.settings-action-btn.logout {
+  background-color: #fff5f5;
+  color: #dc2626;
+  box-shadow: 2px 2px 0px var(--text-ink);
+}
+.settings-action-btn.logout:hover {
+  background-color: #fecaca;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px var(--text-ink);
+}
+.settings-action-btn.logout:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px var(--text-ink);
+}
+
+.settings-action-btn.clear-history {
+  background-color: #f8fafc;
+  color: #475569;
+  box-shadow: 2px 2px 0px var(--text-ink);
+}
+.settings-action-btn.clear-history:hover {
+  background-color: #f1f5f9;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px var(--text-ink);
+}
+.settings-action-btn.clear-history:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px var(--text-ink);
+}
+
+@keyframes fade-in-overlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-up-modal {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
