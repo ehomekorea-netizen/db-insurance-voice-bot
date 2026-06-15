@@ -13,6 +13,13 @@ interface UserRecord {
   groundingCount?: number;
 }
 
+interface BillingData {
+  spend: number;
+  limit: number;
+  balance: number;
+  status: string;
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -21,6 +28,12 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+
+  // Billing States
+  const [billingData, setBillingData] = useState<BillingData | null>(null);
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+
 
   // Chat Logs Modal States
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -35,8 +48,10 @@ export default function AdminPage() {
       setToken(savedToken);
       setIsLoggedIn(true);
       fetchUserList(savedToken);
+      fetchBillingData(savedToken);
     }
   }, []);
+
 
   // Fetch users list from backend API
   const fetchUserList = async (authToken: string) => {
@@ -67,6 +82,44 @@ export default function AdminPage() {
     }
   };
 
+  // Fetch billing details from Google Cloud
+  const fetchBillingData = async (authToken: string) => {
+    setIsBillingLoading(true);
+    setBillingError(null);
+    try {
+      const res = await fetch("/api/admin/billing", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error("결제 정보를 가져오지 못했습니다.");
+      }
+      const data = await res.json();
+      if (data.success) {
+        setBillingData({
+          spend: data.spend,
+          limit: data.limit,
+          balance: data.balance,
+          status: data.status
+        });
+      }
+    } catch (err: any) {
+      setBillingError(err.message || "결제 정보 조회 중 오류가 발생했습니다.");
+    } finally {
+      setIsBillingLoading(false);
+    }
+  };
+
+  // Combined refresh helper
+  const handleRefreshAll = async (authToken: string) => {
+    await Promise.all([
+      fetchUserList(authToken),
+      fetchBillingData(authToken)
+    ]);
+  };
+
   // Submit passcode
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +143,7 @@ export default function AdminPage() {
         setToken(data.token);
         setIsLoggedIn(true);
         fetchUserList(data.token);
+        fetchBillingData(data.token);
       }
     } catch (err: any) {
       setError(err.message || "로그인에 실패했습니다.");
@@ -104,6 +158,8 @@ export default function AdminPage() {
     setToken(null);
     setIsLoggedIn(false);
     setUsers([]);
+    setBillingData(null);
+    setBillingError(null);
     setError(null);
   };
 
@@ -252,27 +308,25 @@ export default function AdminPage() {
             <p>실시간 가입자 조회 및 차단 관리</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="admin-logout-btn">
-          로그아웃
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={() => token && handleRefreshAll(token)}
+            className="admin-refresh-btn"
+            disabled={isLoading || isBillingLoading}
+            style={{ margin: 0, padding: "8px 16px" }}
+          >
+            새로고침 🔄
+          </button>
+          <button onClick={handleLogout} className="admin-logout-btn">
+            로그아웃
+          </button>
+        </div>
       </header>
 
       <section className="admin-dashboard-content">
         <div className="admin-card-panel">
           <div className="panel-header">
             <h2>가입 사용자 목록 ({users.length}명)</h2>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <span className="mobile-scroll-tip">
-                ← 터치 스크롤 가능 →
-              </span>
-              <button
-                onClick={() => token && fetchUserList(token)}
-                className="admin-refresh-btn"
-                disabled={isLoading}
-              >
-                새로고침 🔄
-              </button>
-            </div>
           </div>
 
           {error && <div className="admin-error-banner">{error}</div>}
@@ -369,6 +423,65 @@ export default function AdminPage() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* 구글 API 실시간 사용량 및 잔액 카드 (가입 사용자 목록 바로 아래 배치) */}
+        <div className="admin-card-panel" style={{ marginTop: "24px" }}>
+          <div className="panel-header">
+            <h2>Google API 실시간 사용량 및 잔액</h2>
+            {billingData?.status === "mock_fallback" && (
+              <span style={{ fontSize: "11px", color: "var(--accent-teal, #10b981)", fontWeight: "bold" }}>
+                (데모 모드)
+              </span>
+            )}
+            {billingData?.status === "error_fallback" && (
+              <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "bold" }}>
+                (연동 대기중 - 테이블 생성 중)
+              </span>
+            )}
+          </div>
+          
+          {isBillingLoading && !billingData ? (
+            <div className="admin-loading-spinner" style={{ padding: "20px 0" }}>결제 데이터를 가져오는 중...</div>
+          ) : billingError ? (
+            <div className="admin-error-banner">{billingError}</div>
+          ) : billingData ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "8px 0" }}>
+              {/* 잔액 표시 */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div>
+                  <span style={{ fontSize: "14px", fontWeight: "bold", color: "#64748b" }}>남은 잔액</span>
+                  <div style={{ fontSize: "36px", fontWeight: "900", color: "var(--accent-teal, #10b981)", marginTop: "4px" }}>
+                    ₩{billingData.balance.toLocaleString("ko-KR")}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "bold", color: "#64748b" }}>사용량</span>
+                  <div style={{ fontSize: "20px", fontWeight: "bold", color: "var(--text-ink, #20343A)", marginTop: "4px" }}>
+                    ₩{billingData.spend.toLocaleString("ko-KR")} / ₩{billingData.limit.toLocaleString("ko-KR")}
+                  </div>
+                </div>
+              </div>
+
+              {/* 진행 상태 바 (Progress bar) */}
+              <div style={{ width: "100%", height: "16px", background: "#e2e8f0", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--text-ink)" }}>
+                <div 
+                  style={{ 
+                    width: `${Math.min(100, (billingData.spend / billingData.limit) * 100)}%`, 
+                    height: "100%", 
+                    background: "var(--accent-red, #f43f5e)", 
+                    transition: "width 0.4s ease-out" 
+                  }} 
+                />
+              </div>
+
+              {/* 안내 문구 */}
+              <div style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.4" }}>
+                💡 이번 달(당월 1일~현재) 구글 AI Studio에서 사용된 실시간 API 비용 합산 정보입니다. <br />
+                선불 충전금 <strong>₩{billingData.limit.toLocaleString("ko-KR")}</strong> 기준으로 소모 시 잔액이 자동으로 갱신됩니다.
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
