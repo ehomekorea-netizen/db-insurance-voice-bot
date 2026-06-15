@@ -1599,9 +1599,9 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 
       <main className="messenger-shell">
       {/* Header */}
-      <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px" }}>
+      <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px", position: "relative" }}>
         {/* Left Section: Profile Favicon + Nickname + Setting Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "0 0 140px", minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "0 0 120px", minWidth: 0 }}>
           {kakaoUser && kakaoUser.profileImage ? (
             <img src={kakaoUser.profileImage} alt="" className="avatar-img" style={{ flexShrink: 0 }} />
           ) : (
@@ -1636,13 +1636,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Center Section: Status Indicator Badge */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", alignSelf: "flex-end", flex: "1 1 0%", zIndex: 5, paddingBottom: "1px", height: "22px", overflow: "hidden" }}>
-          <div className="messenger-status-row" style={{ margin: 0 }}>
-            <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
+        <div className="messenger-center-badge-container">
+          <div className="messenger-status-row" style={{ margin: 0, display: "flex", alignItems: "center" }}>
+            <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`} style={{ whiteSpace: "nowrap" }}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
             </span>
             {isConnected && (
-              <span className="session-timer" style={{ marginLeft: "4px" }}>
+              <span className="session-timer" style={{ marginLeft: "4px", whiteSpace: "nowrap" }}>
                 [{formatDuration(sessionDuration)}]
               </span>
             )}
@@ -1650,7 +1650,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Right Section: Help Request Button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "0 0 100px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "0 0 92px" }}>
           {!isConnected && !isConnecting ? (
             <button className="primary-button help-request-btn" onClick={startRealtime} style={{ width: "100%", padding: "8px 0" }}>
               도움요청 🎙️

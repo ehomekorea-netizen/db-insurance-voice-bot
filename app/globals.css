@@ -2424,3 +2424,24 @@ body {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* Center status badge absolute alignment (for no-shift layout) */
+.messenger-center-badge-container {
+  position: absolute !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  bottom: 11px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 5 !important;
+  height: 22px !important;
+  pointer-events: none !important;
+  width: auto !important;
+}
+
+@media (max-width: 480px) {
+  .messenger-center-badge-container {
+    bottom: 8px !important;
+  }
+}
+
