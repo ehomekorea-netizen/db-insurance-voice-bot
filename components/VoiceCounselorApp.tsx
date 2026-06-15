@@ -287,7 +287,7 @@ export function VoiceCounselorApp() {
                 searchEngine: "공시자료 검색",
                 modelName: "Gemini 3.1 Flash-Lite",
                 isSimpleChat: false,
-                disclaimer: "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+                disclaimer: "본 답변은 공식 공시서류와 검색 기반의 AI 추론 결과로 참고용이며, 최종 보상 지급 판단은 실제 심사 결과에 따라 다를 수 있습니다."
               };
 
               return {
@@ -1341,7 +1341,7 @@ export function VoiceCounselorApp() {
                           citations: metadata?.citations || [],
                           searchEngine: metadata?.searchEngine || "실시간 스트리밍",
                           modelName: metadata?.modelName || "Gemini 3.1 Flash-Lite",
-                          disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+                          disclaimer: metadata?.disclaimer || "본 답변은 공식 공시서류와 검색 기반의 AI 추론 결과로 참고용이며, 최종 보상 지급 판단은 실제 심사 결과에 따라 다를 수 있습니다."
                         }
                       }
                     : msg
@@ -1391,7 +1391,7 @@ export function VoiceCounselorApp() {
         searchEngine: metadata?.searchEngine || "실시간 스트리밍",
         modelName: metadata?.modelName || "Gemini 3.1 Flash-Lite",
         isSimpleChat: metadata?.isSimpleChat || false,
-        disclaimer: metadata?.disclaimer || "본 답변은 DB손해보험 공식 상품공시실 기초서류와 구글 실시간 검색을 바탕으로 AI 추론 엔진이 분석한 전문가용 자료이며, 최종 보상 지급 판단은 심사 결과에 따라 다를 수 있습니다."
+        disclaimer: metadata?.disclaimer || "본 답변은 공식 공시서류와 검색 기반의 AI 추론 결과로 참고용이며, 최종 보상 지급 판단은 실제 심사 결과에 따라 다를 수 있습니다."
       } as PolicyAnswer & { isSimpleChat?: boolean };
 
       console.log("[VoiceCounselorApp SSE Done] finalPayload generated:", finalPayload);
@@ -1887,7 +1887,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               src="/promy.png" 
               alt="PROMY" 
               onClick={handleLogoClick} 
-              style={{ width: "24px", height: "24px", cursor: "pointer", borderRadius: "50%", border: "1.5px solid var(--text-ink)" }} 
+              style={{ width: "34px", height: "34px", cursor: "pointer", borderRadius: "50%", border: "1.5px solid var(--text-ink)" }} 
             />
             <span className="settings-modal-title" style={{ flexGrow: 1 }}>설정</span>
             <button className="settings-modal-close" onClick={() => setIsSettingOpen(false)}>×</button>
@@ -2280,8 +2280,8 @@ function MessageBubble({
 
         {ans.disclaimer && (
           <footer className="card-disclaimer" style={{ paddingBottom: "10px", marginBottom: "6px", paddingRight: "0px", marginTop: "4px" }}>
-            <p style={{ margin: 0, textAlign: "center", whiteSpace: "pre-line", wordBreak: "keep-all", lineHeight: "1.4" }}>
-              {ans.disclaimer.replace("자료이며, ", "자료이며,\n")}
+            <p style={{ margin: 0, textAlign: "left", whiteSpace: "pre-line", wordBreak: "keep-all", lineHeight: "1.4" }}>
+              {ans.disclaimer.replace("참고용이며, ", "참고용이며,\n").replace("자료이며, ", "자료이며,\n")}
             </p>
           </footer>
         )}

@@ -816,10 +816,11 @@ body {
   border-top: 1px solid var(--panel-border);
   padding-top: 6px;
   margin-top: -8px; /* Pull closer to the last content section to reduce whitespace */
-  padding-right: 36px; /* Avoid overlap with absolute floating share button */
+  padding-right: 24px; /* Avoid overlap with absolute floating share button */
   font-size: 9.5px;
   color: var(--text-muted);
-  line-height: 1.3;
+  line-height: 1.35;
+  text-align: left !important;
 }
 
 /* Footer / Composer Area */
@@ -2261,8 +2262,8 @@ body {
   color: #ffffff !important;
   border: 1.5px solid var(--text-ink) !important;
   border-radius: 4px !important;
-  padding: 2px 4px !important;
-  font-size: 10.5px !important;
+  padding: 3px 6px !important;
+  font-size: 11.5px !important;
   font-weight: 850 !important;
   box-shadow: 1.5px 1.5px 0px var(--text-ink) !important;
   cursor: pointer !important;
@@ -2270,8 +2271,8 @@ body {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  height: 22px !important;
-  max-width: 90px !important;
+  height: 25px !important;
+  max-width: 95px !important;
   width: 100% !important;
   text-overflow: ellipsis;
   white-space: nowrap;
