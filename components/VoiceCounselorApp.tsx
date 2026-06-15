@@ -1641,11 +1641,6 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`} style={{ whiteSpace: "nowrap" }}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
             </span>
-            {isConnected && (
-              <span className="session-timer" style={{ marginLeft: "4px", whiteSpace: "nowrap" }}>
-                [{formatDuration(sessionDuration)}]
-              </span>
-            )}
           </div>
         </div>
 

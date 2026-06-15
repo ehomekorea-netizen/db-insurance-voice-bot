@@ -254,14 +254,14 @@ body {
 }
 
 .messenger-status {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-ink) !important;
   font-weight: 850;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%) !important;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 99px;
   border: 1.5px solid var(--text-ink) !important;
   box-shadow: 1px 1px 0px var(--text-ink);
@@ -286,7 +286,7 @@ body {
   background: linear-gradient(135deg, #ffe4e6 0%, #fca5a5 100%) !important;
   border: 1.5px solid #dc2626 !important;
   box-shadow: 1px 1px 0px #dc2626;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 900;
 }
 .messenger-status.online::before {
@@ -2171,8 +2171,8 @@ body {
     margin-top: 2px !important;
   }
   .messenger-status {
-    font-size: 9.5px !important;
-    padding: 2px 6px !important;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
     border-width: 1px !important;
     white-space: nowrap !important;
   }
@@ -2419,14 +2419,14 @@ body {
   justify-content: center !important;
   align-items: center !important;
   z-index: 5 !important;
-  height: 22px !important;
+  height: 26px !important;
   pointer-events: none !important;
   width: auto !important;
 }
 
 @media (max-width: 480px) {
   .messenger-center-badge-container {
-    bottom: 8px !important;
+    bottom: 7px !important;
   }
 }
 
