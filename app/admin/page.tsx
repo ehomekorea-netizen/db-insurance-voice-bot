@@ -30,6 +30,10 @@ export default function AdminPage() {
   const [actionUserId, setActionUserId] = useState<string | null>(null);
 
   // Billing States
+  // Tab State ("users": 가입 사용자 목록, "billing": 구글 API 사용량)
+  const [activeTab, setActiveTab] = useState<"users" | "billing">("users");
+
+  // Billing States
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -324,165 +328,186 @@ export default function AdminPage() {
       </header>
 
       <section className="admin-dashboard-content">
-        <div className="admin-card-panel">
-          <div className="panel-header">
-            <h2>가입 사용자 목록 ({users.length}명)</h2>
+        {/* 서류철 라벨 탭 디자인 */}
+        <div className="admin-tab-wrapper">
+          <div
+            onClick={() => setActiveTab("users")}
+            className={`admin-tab-item ${activeTab === "users" ? "active" : "inactive"}`}
+          >
+            📂 가입 사용자 목록
           </div>
+          <div
+            onClick={() => setActiveTab("billing")}
+            className={`admin-tab-item ${activeTab === "billing" ? "active" : "inactive"}`}
+          >
+            💳 Google API 사용량
+          </div>
+        </div>
 
-          {error && <div className="admin-error-banner">{error}</div>}
+        {/* 탭 1: 가입 사용자 목록 */}
+        {activeTab === "users" && (
+          <div className="admin-card-panel">
+            <div className="panel-header">
+              <h2>가입 사용자 목록 ({users.length}명)</h2>
+            </div>
 
-          {isLoading && users.length === 0 ? (
-            <div className="admin-loading-spinner">가입자 데이터를 읽어오는 중...</div>
-          ) : users.length === 0 ? (
-            <div className="admin-empty-state">아직 접속한 사용자가 없습니다.</div>
-          ) : (
-            <div className="admin-table-container">
-              <table className="admin-user-table">
-                <thead>
-                  <tr>
-                    <th>작업</th>
-                    <th>프로필</th>
-                    <th>STT 사용료</th>
-                    <th>API 비용<br/>(그라운딩 횟수)</th>
-                    <th>총 비용</th>
-                    <th>최종 활동 시각</th>
-                    <th>상태</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
-                      {/* 1. 작업 */}
-                      <td>
-                        <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
-                          <button
-                            onClick={() => toggleUserStatus(user.id, user.status)}
-                            className={`admin-action-btn ${
-                              user.status === "approved" ? "block-action" : "approve-action"
-                            }`}
-                            disabled={actionUserId === user.id}
-                            style={{ padding: "4px 8px" }}
-                          >
-                            {actionUserId === user.id
-                              ? "..."
-                              : user.status === "approved"
-                              ? "차단"
-                              : "승인/해제"}
-                          </button>
-                          <button
-                            onClick={() => handleViewChatLogs(user.id, user.nickname)}
-                            className="admin-action-btn approve-action"
-                            style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)", padding: "4px 8px" }}
-                          >
-                            기록
-                          </button>
-                        </div>
-                      </td>
-                      {/* 2. 프로필 (아바타 이미지 + 아래에 이름 배치) */}
-                      <td>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                          <div className="admin-table-avatar" style={{ margin: 0 }}>
-                            {user.profileImage ? (
-                              <img src={user.profileImage} alt={user.nickname} />
-                            ) : (
-                              <div className="admin-avatar-placeholder">
-                                {user.nickname ? user.nickname.slice(0, 2) : "PA"}
-                              </div>
-                            )}
-                          </div>
-                          <span style={{ fontSize: "11px", fontWeight: "900", color: "var(--text-ink)", whiteSpace: "nowrap" }}>
-                            {user.nickname}
-                          </span>
-                        </div>
-                      </td>
-                      {/* 3. STT 사용료 */}
-                      <td>
-                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                      </td>
-                      {/* 4. API 비용 */}
-                      <td>
-                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
-                      </td>
-                      {/* 5. 총 비용 */}
-                      <td style={{ fontWeight: "700" }}>
-                        ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                      </td>
-                      {/* 6. 최종 활동 시각 */}
-                      <td className="text-gray" style={{ fontSize: "11px" }}>
-                        {formatDate(user.updatedAt)}
-                      </td>
-                      {/* 7. 상태 */}
-                      <td>
-                        <span className={`status-badge ${user.status}`} style={{ fontSize: "10.5px", padding: "2px 6px" }}>
-                          {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
-                        </span>
-                      </td>
+            {error && <div className="admin-error-banner">{error}</div>}
+
+            {isLoading && users.length === 0 ? (
+              <div className="admin-loading-spinner">가입자 데이터를 읽어오는 중...</div>
+            ) : users.length === 0 ? (
+              <div className="admin-empty-state">아직 접속한 사용자가 없습니다.</div>
+            ) : (
+              <div className="admin-table-container">
+                <table className="admin-user-table">
+                  <thead>
+                    <tr>
+                      <th>작업</th>
+                      <th>프로필</th>
+                      <th>STT 사용료</th>
+                      <th>API 비용<br/>(그라운딩 횟수)</th>
+                      <th>총 비용</th>
+                      <th>최종 활동 시각</th>
+                      <th>상태</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* 구글 API 실시간 사용량 및 잔액 카드 (가입 사용자 목록 바로 아래 배치) */}
-        <div className="admin-card-panel" style={{ marginTop: "24px" }}>
-          <div className="panel-header">
-            <h2>Google API 실시간 사용량 및 잔액</h2>
-            {billingData?.status === "mock_fallback" && (
-              <span style={{ fontSize: "11px", color: "var(--accent-teal, #10b981)", fontWeight: "bold" }}>
-                (데모 모드)
-              </span>
-            )}
-            {billingData?.status === "error_fallback" && (
-              <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "bold" }}>
-                (연동 대기중 - 테이블 생성 중)
-              </span>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
+                        {/* 1. 작업 */}
+                        <td>
+                          <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                            <button
+                              onClick={() => toggleUserStatus(user.id, user.status)}
+                              className={`admin-action-btn ${
+                                user.status === "approved" ? "block-action" : "approve-action"
+                              }`}
+                              disabled={actionUserId === user.id}
+                              style={{ padding: "4px 8px" }}
+                            >
+                              {actionUserId === user.id
+                                ? "..."
+                                : user.status === "approved"
+                                ? "차단"
+                                : "승인/해제"}
+                            </button>
+                            <button
+                              onClick={() => handleViewChatLogs(user.id, user.nickname)}
+                              className="admin-action-btn approve-action"
+                              style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)", padding: "4px 8px" }}
+                            >
+                              기록
+                            </button>
+                          </div>
+                        </td>
+                        {/* 2. 프로필 (아바타 이미지 + 아래에 이름 배치) */}
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                            <div className="admin-table-avatar" style={{ margin: 0 }}>
+                              {user.profileImage ? (
+                                <img src={user.profileImage} alt={user.nickname} />
+                              ) : (
+                                <div className="admin-avatar-placeholder">
+                                  {user.nickname ? user.nickname.slice(0, 2) : "PA"}
+                                </div>
+                              )}
+                            </div>
+                            <span style={{ fontSize: "11px", fontWeight: "900", color: "var(--text-ink)", whiteSpace: "nowrap" }}>
+                              {user.nickname}
+                            </span>
+                          </div>
+                        </td>
+                        {/* 3. STT 사용료 */}
+                        <td>
+                          ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        </td>
+                        {/* 4. API 비용 */}
+                        <td>
+                          ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
+                        </td>
+                        {/* 5. 총 비용 */}
+                        <td style={{ fontWeight: "700" }}>
+                          ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        </td>
+                        {/* 6. 최종 활동 시각 */}
+                        <td className="text-gray" style={{ fontSize: "11px" }}>
+                          {formatDate(user.updatedAt)}
+                        </td>
+                        {/* 7. 상태 */}
+                        <td>
+                          <span className={`status-badge ${user.status}`} style={{ fontSize: "10.5px", padding: "2px 6px" }}>
+                            {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-          
-          {isBillingLoading && !billingData ? (
-            <div className="admin-loading-spinner" style={{ padding: "20px 0" }}>결제 데이터를 가져오는 중...</div>
-          ) : billingError ? (
-            <div className="admin-error-banner">{billingError}</div>
-          ) : billingData ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "8px 0" }}>
-              {/* 1행: 남은 잔액 (가장 크고 돋보이게) */}
-              <div>
-                <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>남은 잔액</span>
-                <div style={{ fontSize: "36px", fontWeight: "900", color: "var(--accent-teal, #10b981)", marginTop: "4px" }}>
-                  ₩{billingData.balance.toLocaleString("ko-KR")}
-                </div>
-              </div>
+        )}
 
-              {/* 2행: 누적 사용량 (줄바꿈하여 구분) */}
-              <div style={{ borderTop: "1.5px dashed var(--panel-border)", paddingTop: "12px" }}>
-                <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>누적 사용량</span>
-                <div style={{ fontSize: "18px", fontWeight: "bold", color: "var(--text-ink, #20343A)", marginTop: "4px" }}>
-                  ₩{billingData.spend.toLocaleString("ko-KR")} / ₩{billingData.limit.toLocaleString("ko-KR")}
-                </div>
-              </div>
-
-              {/* 3행: 진행 상태 바 (Progress bar) */}
-              <div style={{ width: "100%", height: "16px", background: "#e2e8f0", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--text-ink)", marginTop: "4px" }}>
-                <div 
-                  style={{ 
-                    width: `${Math.min(100, (billingData.spend / billingData.limit) * 100)}%`, 
-                    height: "100%", 
-                    background: "var(--accent-red, #f43f5e)", 
-                    transition: "width 0.4s ease-out" 
-                  }} 
-                />
-              </div>
-
-              {/* 안내 문구 */}
-              <div style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.4" }}>
-                💡 이번 달(당월 1일~현재) 구글 AI Studio에서 사용된 실시간 API 비용 합산 정보입니다. <br />
-                선불 충전금 <strong>₩{billingData.limit.toLocaleString("ko-KR")}</strong> 기준으로 소모 시 잔액이 자동으로 갱신됩니다.
-              </div>
+        {/* 탭 2: Google API 사용량 및 잔액 카드 */}
+        {activeTab === "billing" && (
+          <div className="admin-card-panel">
+            <div className="panel-header">
+              <h2>Google API 실시간 사용량 및 잔액</h2>
+              {billingData?.status === "mock_fallback" && (
+                <span style={{ fontSize: "11px", color: "var(--accent-teal, #10b981)", fontWeight: "bold" }}>
+                  (데모 모드)
+                </span>
+              )}
+              {billingData?.status === "error_fallback" && (
+                <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "bold" }}>
+                  (연동 대기중 - 테이블 생성 중)
+                </span>
+              )}
             </div>
-          ) : null}
-        </div>
+            
+            {isBillingLoading && !billingData ? (
+              <div className="admin-loading-spinner" style={{ padding: "20px 0" }}>결제 데이터를 가져오는 중...</div>
+            ) : billingError ? (
+              <div className="admin-error-banner">{billingError}</div>
+            ) : billingData ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "8px 0" }}>
+                {/* 1행: 남은 잔액 (가장 크고 돋보이게) */}
+                <div>
+                  <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>남은 잔액</span>
+                  <div style={{ fontSize: "36px", fontWeight: "900", color: "var(--accent-teal, #10b981)", marginTop: "4px" }}>
+                    ₩{billingData.balance.toLocaleString("ko-KR")}
+                  </div>
+                </div>
+
+                {/* 2행: 누적 사용량 (줄바꿈하여 구분) */}
+                <div style={{ borderTop: "1.5px dashed var(--panel-border)", paddingTop: "12px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>누적 사용량</span>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "var(--text-ink, #20343A)", marginTop: "4px" }}>
+                    ₩{billingData.spend.toLocaleString("ko-KR")} / ₩{billingData.limit.toLocaleString("ko-KR")}
+                  </div>
+                </div>
+
+                {/* 3행: 진행 상태 바 (Progress bar) */}
+                <div style={{ width: "100%", height: "16px", background: "#e2e8f0", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--text-ink)", marginTop: "4px" }}>
+                  <div 
+                    style={{ 
+                      width: `${Math.min(100, (billingData.spend / billingData.limit) * 100)}%`, 
+                      height: "100%", 
+                      background: "var(--accent-red, #f43f5e)", 
+                      transition: "width 0.4s ease-out" 
+                    }} 
+                  />
+                </div>
+
+                {/* 안내 문구 */}
+                <div style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.4" }}>
+                  💡 이번 달(당월 1일~현재) 구글 AI Studio에서 사용된 실시간 API 비용 합산 정보입니다. <br />
+                  선불 충전금 <strong>₩{billingData.limit.toLocaleString("ko-KR")}</strong> 기준으로 소모 시 잔액이 자동으로 갱신됩니다.
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
       </section>
 
       {selectedUserId && (
