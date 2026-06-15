@@ -273,23 +273,23 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #64748b;
-  box-shadow: 0 0 0 rgba(100, 116, 139, 0.4);
+  background: #000000;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
   flex-shrink: 0;
   animation: pulse-waiting 2s infinite;
 }
 
 .messenger-status.online {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.25);
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
   font-size: 10.5px;
   font-weight: 850;
 }
 .messenger-status.online::before {
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
   animation: pulse-online 1.5s infinite;
 }
 
@@ -554,8 +554,8 @@ body {
 }
 
 .answer-card strong, .answer-card b {
-  color: #c2410c !important;
-  background-color: rgba(249, 115, 22, 0.08) !important;
+  color: var(--accent-green) !important;
+  background-color: rgba(47, 118, 109, 0.08) !important;
   padding: 1px 4px !important;
   border-radius: 4px !important;
   font-weight: 850 !important;
@@ -690,7 +690,7 @@ body {
   color: #334155;
   line-height: 1.65;
   background: #f8fafc;
-  border-left: 3px solid #2563eb;
+  border-left: 3px solid var(--accent-green);
   padding: 10px 12px;
   border-radius: 4px 8px 8px 4px;
 }
@@ -972,15 +972,15 @@ body {
 @keyframes pulse-online {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
   }
   50% {
     transform: scale(1.15);
-    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
   }
 }
 
@@ -1152,7 +1152,7 @@ body {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none;
   margin: 2px 0 8px 0 !important;
-  width: 100% !important;
+  width: 100%;
   border-radius: 6px !important;
   border: 1px solid var(--text-ink) !important;
   box-shadow: 1px 1px 0px var(--text-ink) !important;
@@ -1189,7 +1189,7 @@ body {
 @media (max-width: 768px) {
   .accordion-header {
     margin: 2px 0 6px 0 !important;
-    width: 100% !important;
+    width: 100%;
   }
   .accordion-header-content {
     padding: 6px 8px;
@@ -1412,6 +1412,12 @@ body {
   background: #eab308 !important;
   transform: translateY(-1px) !important;
   box-shadow: 3px 3px 0px #000000 !important;
+}
+
+.zoom-toggle-btn:focus,
+.zoom-toggle-btn:active {
+  background: #facc15 !important;
+  outline: none !important;
 }
 
 /* Model Pill Badge: Static Button Styling */
@@ -1782,8 +1788,14 @@ body {
   font-size: 13px;
 }
 
+.admin-user-table th,
+.admin-user-table td {
+  white-space: nowrap !important;
+  padding: 12px 18px !important;
+  text-align: left;
+}
+
 .admin-user-table th {
-  padding: 12px 10px;
   font-weight: 800;
   color: var(--text-secondary);
   border-bottom: 2px solid var(--text-ink);
@@ -1791,10 +1803,24 @@ body {
 }
 
 .admin-user-table td {
-  padding: 14px 10px;
   border-bottom: 1px solid rgba(32, 52, 58, 0.08);
   vertical-align: middle;
   color: var(--text-ink);
+}
+
+.admin-user-table th:nth-child(5), 
+.admin-user-table td:nth-child(5) {
+  min-width: 320px !important;
+}
+
+.admin-user-table th:nth-child(3), 
+.admin-user-table td:nth-child(3) {
+  min-width: 160px !important;
+}
+
+.admin-user-table th:nth-child(7), 
+.admin-user-table td:nth-child(7) {
+  min-width: 140px !important;
 }
 
 .admin-user-table tbody tr:hover {

@@ -860,7 +860,7 @@ export function VoiceCounselorApp() {
       inactivityTimerRef.current = setTimeout(() => {
         console.log("5초간 무반응 상태로 음성 세션을 자동 종료합니다.");
         stopRealtime();
-        addMessage({ role: "assistant", content: "응답이 없어 대화를 종료합니다." });
+        addMessage({ role: "assistant", content: "응답이 없어 대화를 종료합니다 😭" });
       }, 5 * 1000);
     }
   }
@@ -1598,42 +1598,20 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
 
       <main className="messenger-shell">
       {/* Header */}
-      <header className="messenger-header">
-        <div className="messenger-brand">
+      <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px" }}>
+        {/* Left Section: Profile Favicon + Logout + Trash */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 0%", minWidth: 0 }}>
           {kakaoUser && kakaoUser.profileImage ? (
-            <img src={kakaoUser.profileImage} alt="" className="avatar-img" />
+            <img src={kakaoUser.profileImage} alt="" className="avatar-img" style={{ flexShrink: 0 }} />
           ) : (
-            <div className="avatar-img-fallback">
+            <div className="avatar-img-fallback" style={{ flexShrink: 0 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#ffffff" }}>
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
               </svg>
             </div>
           )}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              {kakaoUser ? (
-                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>
-                  {formatNicknamePA(kakaoUser.nickname)}
-                </h2>
-              ) : (
-                <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "var(--text-ink)" }}>PA님</h2>
-              )}
-            </div>
-            <div className="messenger-status-row">
-              <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
-                {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
-              </span>
-              {isConnected && (
-                <span className="session-timer">
-                  [{formatDuration(sessionDuration)}]
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="messenger-header-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           {isLoggedIn && (
-            <button className="logout-btn" onClick={handleLogout} title="로그아웃">
+            <button className="logout-btn" onClick={handleLogout} title="로그아웃" style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", flexShrink: 0 }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -1647,12 +1625,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               border: "none",
               color: "#94a3b8",
               cursor: "pointer",
-              padding: "8px",
+              padding: "6px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               borderRadius: "50%",
-              transition: "background-color 0.2s"
+              transition: "background-color 0.2s",
+              flexShrink: 0
             }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1662,6 +1641,24 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
               </svg>
             </button>
           )}
+        </div>
+
+        {/* Center Section: Status Indicator Badge */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: "0 0 auto", zIndex: 5 }}>
+          <div className="messenger-status-row" style={{ margin: 0 }}>
+            <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
+              {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
+            </span>
+            {isConnected && (
+              <span className="session-timer" style={{ marginLeft: "4px" }}>
+                [{formatDuration(sessionDuration)}]
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section: Help Request Button */}
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "1 1 0%" }}>
           {!isConnected && !isConnecting ? (
             <button className="primary-button help-request-btn" onClick={startRealtime}>
               도움요청 🎙️
@@ -1982,6 +1979,8 @@ function MessageBubble({
 
   if (message.role === "assistant" && !message.answer) {
     const isWelcomeText = message.content.includes("PA님 무엇을 도와드릴까요?");
+    const isExitText = message.content.includes("응답이 없어 대화를 종료합니다");
+    const isBoldText = isWelcomeText || isExitText;
     let displayContent = message.content;
     if (isWelcomeText && !displayContent.includes("😊")) {
       displayContent = "PA님 무엇을 도와드릴까요? 😊";
@@ -1990,7 +1989,7 @@ function MessageBubble({
       <div 
         className="message assistant-bubble" 
         style={{ 
-          fontWeight: isWelcomeText ? "800" : "normal" 
+          fontWeight: isBoldText ? "800" : "normal" 
         }}
       >
         {displayContent}
@@ -2040,59 +2039,61 @@ function MessageBubble({
 
     return (
       <article className={`message assistant answer-card ${isZoomed ? "large-font" : ""}`} style={{ position: "relative", maxWidth: "100%", width: "100%", boxSizing: "border-box" }}>
-        <div className="card-top" style={{ display: "flex", alignItems: "center", width: "100%", borderBottom: "2px solid var(--text-ink)", paddingBottom: "12px", marginBottom: "4px" }}>
-          <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0, paddingLeft: "12px", paddingRight: "12px" }}>
-            {ans.headline && (
-              <h3 
-                className="card-headline-title" 
-                style={{ 
-                  margin: 0, 
-                  fontSize: ans.headline.length > 20 ? "13px" : ans.headline.length > 15 ? "15px" : "17.5px",
-                  fontWeight: "900", 
-                  color: "var(--text-ink)", 
-                  fontStyle: "italic", 
-                  lineHeight: "1.3",
-                  textAlign: "center",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                {ans.headline.startsWith('"') ? ans.headline : `"${ans.headline}"`}
-              </h3>
-            )}
-          </div>
-          <button className="zoom-toggle-btn" style={{ flexShrink: 0 }} onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
-            {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
-          </button>
+        <div className="card-top" style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", borderBottom: "2px solid var(--text-ink)", padding: "16px 0", marginBottom: "4px" }}>
+          {ans.headline && (
+            <h3 
+              className="card-headline-title" 
+              style={{ 
+                margin: 0, 
+                fontSize: ans.headline.length > 25 ? "15.5px" : ans.headline.length > 18 ? "17.5px" : "19.5px",
+                fontWeight: "900", 
+                color: "var(--text-ink)", 
+                fontStyle: "italic", 
+                lineHeight: "1.3",
+                textAlign: "center",
+                width: "100%",
+                display: "block"
+              }}
+            >
+              {ans.headline.startsWith('"') ? ans.headline : `"${ans.headline}"`}
+            </h3>
+          )}
         </div>
 
         {/* 질문 이해 및 분석 근거 (최상단 아코디언 배치) */}
         {ans.analysis && (
           <div className="answer-section">
-            <h4
-              className="section-title accordion-header"
-              onClick={() => setIsExpanded(!isExpanded)}
-              style={{
-                backgroundColor: isExpanded ? "rgba(37, 99, 235, 0.03)" : "transparent",
-                transition: "background-color 0.2s"
-              }}
-              title="클릭하여 분석 근거 상세 보기"
-            >
-              <div className="accordion-header-content">
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ color: "var(--accent-green)", marginRight: "4px", fontSize: "13px", fontWeight: "bold" }}>★</span>
-                  <span style={{ fontWeight: "700", fontSize: "12.5px", color: "var(--text-ink)" }}>질문 이해 및 분석근거</span>
+            <div className="accordion-wrapper-row" style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginBottom: "8px" }}>
+              <h4
+                className="section-title accordion-header"
+                onClick={() => setIsExpanded(!isExpanded)}
+                style={{
+                  backgroundColor: isExpanded ? "rgba(47, 118, 109, 0.03)" : "transparent",
+                  transition: "background-color 0.2s",
+                  flex: 1,
+                  margin: 0,
+                  width: "0px"
+                }}
+                title="클릭하여 분석 근거 상세 보기"
+              >
+                <div className="accordion-header-content">
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ color: "var(--accent-green)", marginRight: "4px", fontSize: "13px", fontWeight: "bold" }}>★</span>
+                    <span style={{ fontWeight: "700", fontSize: "12.5px", color: "var(--text-ink)" }}>질문 이해 및 분석근거</span>
+                  </div>
+                  <span className="accordion-toggle-tag">
+                    {isExpanded ? (
+                      <>내용접기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▲</span></>
+                    ) : (
+                      <>내용열기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▼</span></>
+                    )}
+                  </span>
                 </div>
-                <span className="accordion-toggle-tag">
-                  {isExpanded ? (
-                    <>내용접기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▲</span></>
-                  ) : (
-                    <>내용열기<span style={{ color: "var(--accent-green)", marginLeft: "2px", fontWeight: "900" }}>▼</span></>
-                  )}
-                </span>
-              </div>
-            </h4>
+              </h4>
+              <button className="zoom-toggle-btn" style={{ flexShrink: 0, height: "30px", fontSize: "11px", padding: "4px 8px", margin: 0 }} onClick={() => setIsZoomed(!isZoomed)} title="글씨 크기 확대/축소">
+                {isZoomed ? "글씨 축소 -" : "글씨 확대 +"}
+              </button>
+            </div>
             {isExpanded && (
               <div style={{ marginTop: "4px" }}>
                 <p className="analysis-text" style={{ whiteSpace: "pre-line", lineHeight: "1.65", color: "#334155" }}>
