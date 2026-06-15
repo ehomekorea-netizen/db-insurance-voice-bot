@@ -33,6 +33,20 @@ export default function AdminPage() {
   // Tab State ("users": 가입 사용자 목록, "billing": 구글 API 사용량)
   const [activeTab, setActiveTab] = useState<"users" | "billing">("users");
 
+  // Sorting States
+  const [sortKey, setSortKey] = useState<"updatedAt" | "totalCost">("updatedAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // Sort Handler
+  const handleSort = (key: "updatedAt" | "totalCost") => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection("desc"); // 다른 열을 누르면 우선 내림차순(최신/최고 비용순)으로 시작
+    }
+  };
+
   // Billing States
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
@@ -345,108 +359,140 @@ export default function AdminPage() {
         </div>
 
         {/* 탭 1: 가입 사용자 목록 */}
-        {activeTab === "users" && (
-          <div className="admin-card-panel">
-            <div className="panel-header">
-              <h2>가입 사용자 목록 ({users.length}명)</h2>
-            </div>
+        {activeTab === "users" && (() => {
+          // 렌더링용 정렬 배열 연산
+          const sortedUsers = [...users].sort((a, b) => {
+            let valA: number | string = 0;
+            let valB: number | string = 0;
 
-            {error && <div className="admin-error-banner">{error}</div>}
+            if (sortKey === "totalCost") {
+              valA = (a.geminiCost || 0) + (a.whisperCost || 0);
+              valB = (b.geminiCost || 0) + (b.whisperCost || 0);
+            } else if (sortKey === "updatedAt") {
+              valA = a.updatedAt || "";
+              valB = b.updatedAt || "";
+            }
 
-            {isLoading && users.length === 0 ? (
-              <div className="admin-loading-spinner">가입자 데이터를 읽어오는 중...</div>
-            ) : users.length === 0 ? (
-              <div className="admin-empty-state">아직 접속한 사용자가 없습니다.</div>
-            ) : (
-              <div className="admin-table-container">
-                <table className="admin-user-table">
-                  <thead>
-                    <tr>
-                      <th>작업</th>
-                      <th>프로필</th>
-                      <th>STT 사용료</th>
-                      <th>API 비용<br/>(그라운딩 횟수)</th>
-                      <th>총 비용</th>
-                      <th>최종 활동 시각</th>
-                      <th>상태</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
-                        {/* 1. 작업 */}
-                        <td>
-                          <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
-                            <button
-                              onClick={() => toggleUserStatus(user.id, user.status)}
-                              className={`admin-action-btn ${
-                                user.status === "approved" ? "block-action" : "approve-action"
-                              }`}
-                              disabled={actionUserId === user.id}
-                              style={{ padding: "4px 8px" }}
-                            >
-                              {actionUserId === user.id
-                                ? "..."
-                                : user.status === "approved"
-                                ? "차단"
-                                : "승인/해제"}
-                            </button>
-                            <button
-                              onClick={() => handleViewChatLogs(user.id, user.nickname)}
-                              className="admin-action-btn approve-action"
-                              style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)", padding: "4px 8px" }}
-                            >
-                              기록
-                            </button>
-                          </div>
-                        </td>
-                        {/* 2. 프로필 (아바타 이미지 + 아래에 이름 배치) */}
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                            <div className="admin-table-avatar" style={{ margin: 0 }}>
-                              {user.profileImage ? (
-                                <img src={user.profileImage} alt={user.nickname} />
-                              ) : (
-                                <div className="admin-avatar-placeholder">
-                                  {user.nickname ? user.nickname.slice(0, 2) : "PA"}
-                                </div>
-                              )}
-                            </div>
-                            <span style={{ fontSize: "11px", fontWeight: "900", color: "var(--text-ink)", whiteSpace: "nowrap" }}>
-                              {user.nickname}
-                            </span>
-                          </div>
-                        </td>
-                        {/* 3. STT 사용료 */}
-                        <td>
-                          ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                        </td>
-                        {/* 4. API 비용 */}
-                        <td>
-                          ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
-                        </td>
-                        {/* 5. 총 비용 */}
-                        <td style={{ fontWeight: "700" }}>
-                          ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                        </td>
-                        {/* 6. 최종 활동 시각 */}
-                        <td className="text-gray" style={{ fontSize: "11px" }}>
-                          {formatDate(user.updatedAt)}
-                        </td>
-                        {/* 7. 상태 */}
-                        <td>
-                          <span className={`status-badge ${user.status}`} style={{ fontSize: "10.5px", padding: "2px 6px" }}>
-                            {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+            if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+            return 0;
+          });
+
+          return (
+            <div className="admin-card-panel">
+              <div className="panel-header">
+                <h2>가입 사용자 목록 ({users.length}명)</h2>
               </div>
-            )}
-          </div>
-        )}
+
+              {error && <div className="admin-error-banner">{error}</div>}
+
+              {isLoading && users.length === 0 ? (
+                <div className="admin-loading-spinner">가입자 데이터를 읽어오는 중...</div>
+              ) : users.length === 0 ? (
+                <div className="admin-empty-state">아직 접속한 사용자가 없습니다.</div>
+              ) : (
+                <div className="admin-table-container">
+                  <table className="admin-user-table">
+                    <thead>
+                      <tr>
+                        <th>작업</th>
+                        <th>프로필</th>
+                        <th>STT 사용료</th>
+                        <th>API 비용<br/>(그라운딩 횟수)</th>
+                        <th 
+                          onClick={() => handleSort("totalCost")} 
+                          style={{ cursor: "pointer", userSelect: "none" }}
+                          title="총 비용 정렬"
+                        >
+                          총 비용 {sortKey === "totalCost" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                        </th>
+                        <th 
+                          onClick={() => handleSort("updatedAt")} 
+                          style={{ cursor: "pointer", userSelect: "none" }}
+                          title="최종 활동 시각 정렬"
+                        >
+                          최종 활동 시각 {sortKey === "updatedAt" ? (sortDirection === "asc" ? "▲" : "▼") : "↕"}
+                        </th>
+                        <th>상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedUsers.map((user) => (
+                        <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
+                          {/* 1. 작업 */}
+                          <td>
+                            <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+                              <button
+                                onClick={() => toggleUserStatus(user.id, user.status)}
+                                className={`admin-action-btn ${
+                                  user.status === "approved" ? "block-action" : "approve-action"
+                                }`}
+                                disabled={actionUserId === user.id}
+                                style={{ padding: "4px 8px" }}
+                              >
+                                {actionUserId === user.id
+                                  ? "..."
+                                  : user.status === "approved"
+                                  ? "차단"
+                                  : "승인/해제"}
+                              </button>
+                              <button
+                                onClick={() => handleViewChatLogs(user.id, user.nickname)}
+                                className="admin-action-btn approve-action"
+                                style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)", padding: "4px 8px" }}
+                              >
+                                기록
+                              </button>
+                            </div>
+                          </td>
+                          {/* 2. 프로필 (아바타 이미지 + 아래에 이름 배치) */}
+                          <td>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                              <div className="admin-table-avatar" style={{ margin: 0 }}>
+                                {user.profileImage ? (
+                                  <img src={user.profileImage} alt={user.nickname} />
+                                ) : (
+                                  <div className="admin-avatar-placeholder">
+                                    {user.nickname ? user.nickname.slice(0, 2) : "PA"}
+                                  </div>
+                                )}
+                              </div>
+                              <span style={{ fontSize: "11px", fontWeight: "900", color: "var(--text-ink)", whiteSpace: "nowrap" }}>
+                                {user.nickname}
+                              </span>
+                            </div>
+                          </td>
+                          {/* 3. STT 사용료 */}
+                          <td>
+                            ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          </td>
+                          {/* 4. API 비용 */}
+                          <td>
+                            ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
+                          </td>
+                          {/* 5. 총 비용 */}
+                          <td style={{ fontWeight: "700" }}>
+                            ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          </td>
+                          {/* 6. 최종 활동 시각 */}
+                          <td className="text-gray" style={{ fontSize: "11px" }}>
+                            {formatDate(user.updatedAt)}
+                          </td>
+                          {/* 7. 상태 */}
+                          <td>
+                            <span className={`status-badge ${user.status}`} style={{ fontSize: "10.5px", padding: "2px 6px" }}>
+                              {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 탭 2: Google API 사용량 및 잔액 카드 */}
         {activeTab === "billing" && (
