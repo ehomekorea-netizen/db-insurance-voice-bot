@@ -1551,11 +1551,11 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {showCover && (
         <main className={`cover-shell ${fadeCover ? "fade-out" : ""}`}>
           <div className="cover-card">
-            <div className="promy-avatar-lg" onClick={handleLogoClick} style={{ cursor: "pointer" }}>
+            <div className="promy-avatar-lg">
               <img src="/promy.png" alt="PROMY" className="welcome-promy-img" />
             </div>
             <h1 className="cover-title">동목포 오멘토</h1>
-            <p className="cover-description">
+            <p className="cover-description" style={{ wordBreak: "keep-all" }}>
               동목포 PA님들의 영업을 지원하는 멘토
             </p>
             {!isLoggedIn && (
@@ -1601,7 +1601,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Header */}
       <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px", position: "relative" }}>
         {/* Left Section: Profile Favicon + Nickname + Setting Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "0 0 120px", minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "0 0 100px", minWidth: 0 }}>
           {kakaoUser && kakaoUser.profileImage ? (
             <img src={kakaoUser.profileImage} alt="" className="avatar-img" style={{ flexShrink: 0 }} />
           ) : (
@@ -1628,8 +1628,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 className="setting-small-btn"
                 onClick={() => setIsSettingOpen(true)}
                 title="설정"
+                style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "3px" }}
               >
-                설정 ⚙️
+                <span>설정</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
               </button>
             )}
           </div>
@@ -1645,14 +1650,20 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Right Section: Help Request Button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "0 0 92px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "0 0 86px" }}>
           {!isConnected && !isConnecting ? (
-            <button className="primary-button help-request-btn" onClick={startRealtime} style={{ width: "100%", padding: "8px 0" }}>
-              도움요청 🎙️
+            <button className="primary-button help-request-btn" onClick={startRealtime} style={{ width: "100%", padding: "6px 0", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+              <span>도움요청</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M12 19v3"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <rect x="9" y="2" width="6" height="13" rx="3"/>
+              </svg>
             </button>
           ) : (
-            <button className="danger-button help-request-btn" onClick={stopRealtime} disabled={isConnecting} style={{ width: "100%", padding: "8px 0" }}>
-              {isConnecting ? "연결 중..." : "상담 종료 ✖"}
+            <button className="danger-button help-request-btn" onClick={stopRealtime} disabled={isConnecting} style={{ width: "100%", padding: "6px 0", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+              <span>{isConnecting ? "연결 중..." : "상담 종료"}</span>
+              {!isConnecting && <span style={{ fontSize: "11px", marginLeft: "1px" }}>✖</span>}
             </button>
           )}
         </div>
@@ -1871,8 +1882,14 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
     {isSettingOpen && (
       <div className="settings-modal-overlay" onClick={() => setIsSettingOpen(false)}>
         <div className="settings-modal-container" onClick={(e) => e.stopPropagation()}>
-          <div className="settings-modal-header">
-            <span className="settings-modal-title">설정</span>
+          <div className="settings-modal-header" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <img 
+              src="/promy.png" 
+              alt="PROMY" 
+              onClick={handleLogoClick} 
+              style={{ width: "24px", height: "24px", cursor: "pointer", borderRadius: "50%", border: "1.5px solid var(--text-ink)" }} 
+            />
+            <span className="settings-modal-title" style={{ flexGrow: 1 }}>설정</span>
             <button className="settings-modal-close" onClick={() => setIsSettingOpen(false)}>×</button>
           </div>
           <div className="settings-modal-body">
@@ -2066,9 +2083,7 @@ function MessageBubble({
       return (
         <div 
           className="message assistant-bubble collapsed-bubble-content" 
-          onClick={onToggleCollapse}
           style={{ 
-            cursor: "pointer", 
             display: "flex", 
             flexDirection: "column",
             alignItems: "stretch", 
