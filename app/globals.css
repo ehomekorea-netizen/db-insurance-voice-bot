@@ -1666,13 +1666,15 @@ body {
 
 /* Admin Dashboard */
 .admin-dashboard-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
   width: 100vw;
   background-color: var(--bg-paper);
   background-image: radial-gradient(var(--panel-tint) 1px, transparent 0);
   background-size: 24px 24px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .admin-dashboard-header {
@@ -1763,18 +1765,29 @@ body {
 }
 
 .admin-refresh-btn {
-  padding: 6px 12px;
-  background: var(--bg-paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: #ffffff;
   border: 2px solid var(--text-ink);
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 800;
+  border-radius: 8px;
   cursor: pointer;
+  box-shadow: 2px 2px 0px var(--text-ink);
   transition: all 0.2s;
 }
 
 .admin-refresh-btn:hover {
-  background: var(--panel-tint);
+  background: var(--bg-paper);
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0px var(--text-ink);
+}
+
+.admin-refresh-btn:active {
+  transform: translateY(1px);
+  box-shadow: 1px 1px 0px var(--text-ink);
 }
 
 .admin-error-banner {

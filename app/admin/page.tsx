@@ -313,9 +313,9 @@ export default function AdminPage() {
             onClick={() => token && handleRefreshAll(token)}
             className="admin-refresh-btn"
             disabled={isLoading || isBillingLoading}
-            style={{ margin: 0, padding: "8px 16px" }}
+            title="새로고침"
           >
-            새로고침 🔄
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
           </button>
           <button onClick={handleLogout} className="admin-logout-btn">
             로그아웃
@@ -447,24 +447,24 @@ export default function AdminPage() {
             <div className="admin-error-banner">{billingError}</div>
           ) : billingData ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "8px 0" }}>
-              {/* 잔액 표시 */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div>
-                  <span style={{ fontSize: "14px", fontWeight: "bold", color: "#64748b" }}>남은 잔액</span>
-                  <div style={{ fontSize: "36px", fontWeight: "900", color: "var(--accent-teal, #10b981)", marginTop: "4px" }}>
-                    ₩{billingData.balance.toLocaleString("ko-KR")}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "14px", fontWeight: "bold", color: "#64748b" }}>사용량</span>
-                  <div style={{ fontSize: "20px", fontWeight: "bold", color: "var(--text-ink, #20343A)", marginTop: "4px" }}>
-                    ₩{billingData.spend.toLocaleString("ko-KR")} / ₩{billingData.limit.toLocaleString("ko-KR")}
-                  </div>
+              {/* 1행: 남은 잔액 (가장 크고 돋보이게) */}
+              <div>
+                <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>남은 잔액</span>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "var(--accent-teal, #10b981)", marginTop: "4px" }}>
+                  ₩{billingData.balance.toLocaleString("ko-KR")}
                 </div>
               </div>
 
-              {/* 진행 상태 바 (Progress bar) */}
-              <div style={{ width: "100%", height: "16px", background: "#e2e8f0", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--text-ink)" }}>
+              {/* 2행: 누적 사용량 (줄바꿈하여 구분) */}
+              <div style={{ borderTop: "1.5px dashed var(--panel-border)", paddingTop: "12px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "bold", color: "#64748b" }}>누적 사용량</span>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "var(--text-ink, #20343A)", marginTop: "4px" }}>
+                  ₩{billingData.spend.toLocaleString("ko-KR")} / ₩{billingData.limit.toLocaleString("ko-KR")}
+                </div>
+              </div>
+
+              {/* 3행: 진행 상태 바 (Progress bar) */}
+              <div style={{ width: "100%", height: "16px", background: "#e2e8f0", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--text-ink)", marginTop: "4px" }}>
                 <div 
                   style={{ 
                     width: `${Math.min(100, (billingData.spend / billingData.limit) * 100)}%`, 
