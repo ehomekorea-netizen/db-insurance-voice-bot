@@ -1966,26 +1966,8 @@ function renderFormattedText(text: string | undefined, isSimple: boolean = false
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       const cleanText = part.slice(2, -2);
-      if (isSimple) {
-        return (
-          <strong key={index} style={{ fontWeight: "800", color: "#000000" }}>
-            {cleanText}
-          </strong>
-        );
-      }
       return (
-        <strong
-          key={index}
-          style={{
-            fontWeight: "700",
-            color: "#0f172a",
-            backgroundColor: "rgba(37, 99, 235, 0.08)",
-            borderBottom: "1.5px solid rgba(37, 99, 235, 0.3)",
-            padding: "0 4px",
-            borderRadius: "3px",
-            margin: "0 2px"
-          }}
-        >
+        <strong key={index} style={{ fontWeight: "850", color: "var(--text-ink, #000000)" }}>
           {cleanText}
         </strong>
       );
@@ -2182,9 +2164,11 @@ function MessageBubble({
             <h4 className="section-title">
               <span className="icon-badge badge-summary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
-                  <line x1="9" y1="18" x2="15" y2="18"></line>
-                  <line x1="10" y1="22" x2="14" y2="22"></line>
+                  <path d="M15 4H7"/>
+                  <path d="m18 16 3 3-3 3"/>
+                  <path d="M3 4v13a2 2 0 0 0 2 2h16"/>
+                  <path d="M7 14h7"/>
+                  <path d="M7 9h12"/>
                 </svg>
               </span>
               핵심 답변 요약
@@ -2200,8 +2184,8 @@ function MessageBubble({
             <h4 className="section-title">
               <span className="icon-badge badge-conditions">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  <path d="m9 11 2 2 4-4"></path>
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                  <path d="m9 12 2 2 4-4"/>
                 </svg>
               </span>
               보장 대상 및 지급 조건
@@ -2219,9 +2203,9 @@ function MessageBubble({
             <h4 className="section-title">
               <span className="icon-badge badge-cautions">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
+                  <path d="M12 9v4"/>
+                  <path d="M12 17h.01"/>
                 </svg>
               </span>
               보장 제외 및 유의사항 (면책)
@@ -2295,8 +2279,10 @@ function MessageBubble({
         )}
 
         {ans.disclaimer && (
-          <footer className="card-disclaimer">
-            <p>{ans.disclaimer}</p>
+          <footer className="card-disclaimer" style={{ paddingBottom: "10px", marginBottom: "6px", paddingRight: "0px", marginTop: "4px" }}>
+            <p style={{ margin: 0, textAlign: "center", whiteSpace: "pre-line", wordBreak: "keep-all", lineHeight: "1.4" }}>
+              {ans.disclaimer.replace("자료이며, ", "자료이며,\n")}
+            </p>
           </footer>
         )}
 
