@@ -286,48 +286,20 @@ export default function AdminPage() {
               <table className="admin-user-table">
                 <thead>
                   <tr>
+                    <th>작업</th>
                     <th>프로필</th>
                     <th>닉네임</th>
                     <th>카카오 ID</th>
                     <th>STT 사용료</th>
-                    <th>Gemini 3.1 Flash-Lite 비용 (그라운딩 횟수)</th>
+                    <th>API 비용<br/>(그라운딩 횟수)</th>
                     <th>총 비용</th>
                     <th>최종 활동 시각</th>
                     <th>상태</th>
-                    <th>작업</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
-                      <td>
-                        <div className="admin-table-avatar">
-                          {user.profileImage ? (
-                            <img src={user.profileImage} alt={user.nickname} />
-                          ) : (
-                            <div className="admin-avatar-placeholder">
-                              {user.nickname ? user.nickname.slice(0, 2) : "PA"}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="font-bold">{user.nickname}</td>
-                      <td className="text-gray">{user.id}</td>
-                      <td>
-                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                      </td>
-                      <td>
-                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ({user.groundingCount || 0}회)
-                      </td>
-                      <td style={{ fontWeight: "700" }}>
-                        ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                      </td>
-                      <td className="text-gray">{formatDate(user.updatedAt)}</td>
-                      <td>
-                        <span className={`status-badge ${user.status}`}>
-                          {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
-                        </span>
-                      </td>
                       <td>
                         <div style={{ display: "flex", gap: "6px" }}>
                           <button
@@ -351,6 +323,34 @@ export default function AdminPage() {
                             대화 기록
                           </button>
                         </div>
+                      </td>
+                      <td>
+                        <div className="admin-table-avatar">
+                          {user.profileImage ? (
+                            <img src={user.profileImage} alt={user.nickname} />
+                          ) : (
+                            <div className="admin-avatar-placeholder">
+                              {user.nickname ? user.nickname.slice(0, 2) : "PA"}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-bold">{user.nickname}</td>
+                      <td className="text-gray">{user.id}</td>
+                      <td>
+                        ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </td>
+                      <td>
+                        ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
+                      </td>
+                      <td style={{ fontWeight: "700" }}>
+                        ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </td>
+                      <td className="text-gray">{formatDate(user.updatedAt)}</td>
+                      <td>
+                        <span className={`status-badge ${user.status}`}>
+                          {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
+                        </span>
                       </td>
                     </tr>
                   ))}

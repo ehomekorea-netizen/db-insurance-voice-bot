@@ -1601,7 +1601,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
       {/* Header */}
       <header className="messenger-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 16px" }}>
         {/* Left Section: Profile Favicon + Nickname + Setting Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: isConnected ? "1.2 1 0%" : "1 1 0%", minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "0 0 140px", minWidth: 0 }}>
           {kakaoUser && kakaoUser.profileImage ? (
             <img src={kakaoUser.profileImage} alt="" className="avatar-img" style={{ flexShrink: 0 }} />
           ) : (
@@ -1636,7 +1636,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Center Section: Status Indicator Badge */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", alignSelf: "flex-end", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px", paddingBottom: "1px", height: "22px" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", alignSelf: "flex-end", flex: "1 1 0%", zIndex: 5, paddingBottom: "1px", height: "22px", overflow: "hidden" }}>
           <div className="messenger-status-row" style={{ margin: 0 }}>
             <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
@@ -1650,13 +1650,13 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Right Section: Help Request Button */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: isConnected ? "0.8 1 0%" : "1 1 0%" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flex: "0 0 100px" }}>
           {!isConnected && !isConnecting ? (
-            <button className="primary-button help-request-btn" onClick={startRealtime}>
+            <button className="primary-button help-request-btn" onClick={startRealtime} style={{ width: "100%", padding: "8px 0" }}>
               도움요청 🎙️
             </button>
           ) : (
-            <button className="danger-button help-request-btn" onClick={stopRealtime} disabled={isConnecting}>
+            <button className="danger-button help-request-btn" onClick={stopRealtime} disabled={isConnecting} style={{ width: "100%", padding: "8px 0" }}>
               {isConnecting ? "연결 중..." : "상담 종료 ✖"}
             </button>
           )}
