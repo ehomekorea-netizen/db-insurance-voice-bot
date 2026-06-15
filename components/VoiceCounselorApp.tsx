@@ -1636,7 +1636,7 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
         </div>
 
         {/* Center Section: Status Indicator Badge */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px", paddingBottom: "4px" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", alignSelf: "flex-end", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px", paddingBottom: "1px", height: "22px" }}>
           <div className="messenger-status-row" style={{ margin: 0 }}>
             <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
@@ -1935,11 +1935,22 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
   );
 }
 
+function sanitizeMarkdownBold(text: string): string {
+  if (!text) return "";
+  let s = text;
+  // 1. "A **및** B**" -> "**A 및 B**" 형태로 보정
+  s = s.replace(/([^*]+)\s*\*\*및\*\*\s*([^*]+)\*\*/g, "**$1 및 $2**");
+  // 2. 앞에 **가 없고 뒤에만 **가 있는 경우 (예: "단어**") -> "**단어**" 로 보정
+  s = s.replace(/(?<!\*\*)\b([^*]+)\*\*/g, "**$1**");
+  return s;
+}
+
 // Helper to parse double asterisks (e.g. **bold**) and markdown links [text](url) and render them as JSX with styling
 function renderFormattedText(text: string | undefined, isSimple: boolean = false) {
   if (!text) return null;
+  const sanitized = sanitizeMarkdownBold(text);
   const regex = /(\*\*[^*]+\*\*|\[[^\]]+\]\s*\(\s*https?:\/\/[^\s\)]+\s*\))/g;
-  const parts = text.split(regex);
+  const parts = sanitized.split(regex);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       const cleanText = part.slice(2, -2);

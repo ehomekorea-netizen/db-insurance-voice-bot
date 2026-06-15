@@ -78,6 +78,7 @@
     /* 뒤로가기 버튼 */
     .back-link {
       align-self: flex-start;
+      margin-top: calc(env(safe-area-inset-top, 20px) + 20px);
       color: rgba(255, 255, 255, 0.8);
       text-decoration: none;
       font-size: 14px;
@@ -87,7 +88,7 @@
       gap: 6px;
       background: rgba(255, 255, 255, 0.1);
       border: 1.5px solid rgba(255, 255, 255, 0.25);
-      padding: 6px 12px;
+      padding: 10px 16px;
       border-radius: 8px;
       z-index: 10;
       transition: all 0.2s ease;
@@ -198,9 +199,10 @@
       width: 22px;
       height: 22px;
       fill: none;
-      stroke: #3b82f6; /* Safari blue share */
+      stroke: #000000;
       stroke-width: 2.5;
-      background: rgba(255, 255, 255, 0.15);
+      background: #ffffff;
+      border: 1.5px solid var(--text-ink);
       padding: 4px;
       border-radius: 6px;
     }
@@ -241,7 +243,7 @@
   </div>
 
   <!-- 뒤로 가기 링크 -->
-  <div class="back-link" onclick="history.back()">
+  <div class="back-link" onclick="if(window.history.length > 1) { history.back(); } else { window.location.href = '/'; }">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <line x1="19" y1="12" x2="5" y2="12"/>
       <polyline points="12 19 5 12 12 5"/>
