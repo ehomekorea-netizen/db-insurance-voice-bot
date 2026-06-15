@@ -1629,14 +1629,14 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
                 onClick={() => setIsSettingOpen(true)}
                 title="설정"
               >
-                설정
+                설정 ⚙️
               </button>
             )}
           </div>
         </div>
 
         {/* Center Section: Status Indicator Badge */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", flex: "0 0 auto", zIndex: 5, marginRight: isConnected ? "12px" : "0px", paddingBottom: "4px" }}>
           <div className="messenger-status-row" style={{ margin: 0 }}>
             <span className={`messenger-status ${isConnected ? (isMicMuted ? "muted" : "online") : ""}`}>
               {isConnected && isMicMuted ? "🎙️ 동목포 오멘토 답변 중 (음소거)" : statusLabel}
@@ -1881,6 +1881,22 @@ ${ans.summary}${conditionsText}${cautionsText}${requiredInfoText}
             <button className="settings-modal-close" onClick={() => setIsSettingOpen(false)}>×</button>
           </div>
           <div className="settings-modal-body">
+            <button 
+              className="settings-action-btn clear-history" 
+              onClick={() => {
+                setIsSettingOpen(false);
+                window.location.href = "/launch.html";
+              }}
+              style={{ backgroundColor: "var(--bg-paper)", color: "var(--text-ink)", marginBottom: "4px" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+              홈 화면에 추가
+            </button>
+
             <button 
               className="settings-action-btn clear-history" 
               onClick={() => {
@@ -2272,32 +2288,32 @@ function MessageBubble({
           title="공유하기"
           style={{
             position: "absolute",
-            bottom: "-12px",
+            bottom: "-14px",
             right: "12px",
-            height: "28px",
-            padding: "0 8px",
+            height: "34px",
+            padding: "0 12px",
             backgroundColor: isShareHovered ? "#245d55" : "var(--accent-green)",
-            border: "1.5px solid var(--text-ink)",
-            borderRadius: "4px",
+            border: "2px solid var(--text-ink)",
+            borderRadius: "6px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "4px",
             cursor: "pointer",
-            boxShadow: isShareHovered ? "2px 2px 0px var(--text-ink)" : "1.5px 1.5px 0px var(--text-ink)",
+            boxShadow: isShareHovered ? "3px 3px 0px var(--text-ink)" : "2px 2px 0px var(--text-ink)",
             transform: isShareHovered ? "scale(1.05) translateY(-1px)" : "none",
             zIndex: 20,
             transition: "all 0.1s ease"
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "12px", height: "12px", stroke: "white" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "14px", height: "14px", stroke: "white" }}>
             <circle cx="18" cy="5" r="3"/>
             <circle cx="6" cy="12" r="3"/>
             <circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          <span style={{ fontSize: "11px", fontWeight: "850", color: "white" }}>공유</span>
+          <span style={{ fontSize: "12.5px", fontWeight: "850", color: "white" }}>공유</span>
         </div>
       </article>
     );

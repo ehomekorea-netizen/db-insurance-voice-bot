@@ -1152,13 +1152,16 @@ body {
   cursor: pointer !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none;
-  margin: 2px 0 8px 0 !important;
+  margin: 0 !important;
   width: 100%;
   border-radius: 6px !important;
   border: 1px solid var(--text-ink) !important;
   box-shadow: 1px 1px 0px var(--text-ink) !important;
-  display: block !important;
+  display: flex !important;
+  align-items: center !important;
   background: #f8fafc;
+  height: 34px !important;
+  box-sizing: border-box !important;
 }
 @media (hover: hover) {
   .accordion-header:hover {
@@ -1172,7 +1175,8 @@ body {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 6px 10px;
+  padding: 0 10px;
+  height: 100%;
 }
 .accordion-toggle-tag {
   font-size: 10px;
@@ -1408,11 +1412,12 @@ body {
   color: #000000 !important;
   box-shadow: 2px 2px 0px #000000 !important;
   width: 90px !important;
-  height: 32px !important;
+  height: 34px !important;
   display: inline-flex !important;
   justify-content: center !important;
   align-items: center !important;
   white-space: nowrap !important;
+  box-sizing: border-box !important;
 }
 
 .zoom-toggle-btn:hover {
@@ -2263,8 +2268,8 @@ body {
   color: #ffffff !important;
   border: 1.5px solid var(--text-ink) !important;
   border-radius: 4px !important;
-  padding: 2px 8px !important;
-  font-size: 11px !important;
+  padding: 2px 4px !important;
+  font-size: 10.5px !important;
   font-weight: 850 !important;
   box-shadow: 1.5px 1.5px 0px var(--text-ink) !important;
   cursor: pointer !important;
@@ -2273,6 +2278,11 @@ body {
   align-items: center !important;
   justify-content: center !important;
   height: 22px !important;
+  max-width: 90px !important;
+  width: 100% !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .setting-small-btn:hover {
   background-color: #245d55 !important;
