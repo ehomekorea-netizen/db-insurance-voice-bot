@@ -288,8 +288,6 @@ export default function AdminPage() {
                   <tr>
                     <th>작업</th>
                     <th>프로필</th>
-                    <th>닉네임</th>
-                    <th>카카오 ID</th>
                     <th>STT 사용료</th>
                     <th>API 비용<br/>(그라운딩 횟수)</th>
                     <th>총 비용</th>
@@ -300,55 +298,68 @@ export default function AdminPage() {
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.id} className={user.status === "blocked" ? "blocked-row" : ""}>
+                      {/* 1. 작업 */}
                       <td>
-                        <div style={{ display: "flex", gap: "6px" }}>
+                        <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
                           <button
                             onClick={() => toggleUserStatus(user.id, user.status)}
                             className={`admin-action-btn ${
                               user.status === "approved" ? "block-action" : "approve-action"
                             }`}
                             disabled={actionUserId === user.id}
+                            style={{ padding: "4px 8px" }}
                           >
                             {actionUserId === user.id
-                              ? "처리 중..."
+                              ? "..."
                               : user.status === "approved"
-                              ? "차단하기"
+                              ? "차단"
                               : "승인/해제"}
                           </button>
                           <button
                             onClick={() => handleViewChatLogs(user.id, user.nickname)}
                             className="admin-action-btn approve-action"
-                            style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)" }}
+                            style={{ background: "var(--accent-teal, #10b981)", borderColor: "var(--text-ink)", padding: "4px 8px" }}
                           >
-                            대화 기록
+                            기록
                           </button>
                         </div>
                       </td>
+                      {/* 2. 프로필 (아바타 이미지 + 아래에 이름 배치) */}
                       <td>
-                        <div className="admin-table-avatar">
-                          {user.profileImage ? (
-                            <img src={user.profileImage} alt={user.nickname} />
-                          ) : (
-                            <div className="admin-avatar-placeholder">
-                              {user.nickname ? user.nickname.slice(0, 2) : "PA"}
-                            </div>
-                          )}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                          <div className="admin-table-avatar" style={{ margin: 0 }}>
+                            {user.profileImage ? (
+                              <img src={user.profileImage} alt={user.nickname} />
+                            ) : (
+                              <div className="admin-avatar-placeholder">
+                                {user.nickname ? user.nickname.slice(0, 2) : "PA"}
+                              </div>
+                            )}
+                          </div>
+                          <span style={{ fontSize: "11px", fontWeight: "900", color: "var(--text-ink)", whiteSpace: "nowrap" }}>
+                            {user.nickname}
+                          </span>
                         </div>
                       </td>
-                      <td className="font-bold">{user.nickname}</td>
-                      <td className="text-gray">{user.id}</td>
+                      {/* 3. STT 사용료 */}
                       <td>
                         ₩{(user.whisperCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                       </td>
+                      {/* 4. API 비용 */}
                       <td>
                         ₩{(user.geminiCost || 0).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<br/>({user.groundingCount || 0}회)
                       </td>
+                      {/* 5. 총 비용 */}
                       <td style={{ fontWeight: "700" }}>
                         ₩{((user.geminiCost || 0) + (user.whisperCost || 0)).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                       </td>
-                      <td className="text-gray">{formatDate(user.updatedAt)}</td>
+                      {/* 6. 최종 활동 시각 */}
+                      <td className="text-gray" style={{ fontSize: "11px" }}>
+                        {formatDate(user.updatedAt)}
+                      </td>
+                      {/* 7. 상태 */}
                       <td>
-                        <span className={`status-badge ${user.status}`}>
+                        <span className={`status-badge ${user.status}`} style={{ fontSize: "10.5px", padding: "2px 6px" }}>
                           {user.status === "approved" ? "승인됨 🟢" : "차단됨 🔴"}
                         </span>
                       </td>
@@ -367,7 +378,34 @@ export default function AdminPage() {
             <header className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <h2>{selectedUserNickname}님의 대화 기록</h2>
-                <p>카카오 ID: {selectedUserId}</p>
+                <p style={{ display: "inline-flex", alignItems: "center", gap: "6px", margin: "2px 0 0 0" }}>
+                  카카오 ID: <span style={{ fontWeight: "750", color: "var(--text-ink)" }}>{selectedUserId}</span>
+                  <button 
+                    onClick={() => {
+                      if (selectedUserId) {
+                        navigator.clipboard.writeText(selectedUserId);
+                        alert("카카오 ID가 클립보드에 복사되었습니다.");
+                      }
+                    }}
+                    style={{
+                      background: "#e2e8f0",
+                      border: "1.5px solid var(--text-ink, #20343A)",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontSize: "10px",
+                      fontWeight: "900",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "2px",
+                      boxShadow: "1px 1px 0px var(--text-ink, #20343A)",
+                      color: "var(--text-ink)"
+                    }}
+                    title="카카오 ID 복사"
+                  >
+                    복사 📋
+                  </button>
+                </p>
               </div>
               <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                 {chatLogs.length > 0 && (

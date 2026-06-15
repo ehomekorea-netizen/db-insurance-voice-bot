@@ -1804,43 +1804,28 @@ body {
 .admin-user-table {
   width: 100%;
   border-collapse: collapse;
-  text-align: left;
-  font-size: 13px;
+  text-align: center;
+  font-size: 12.5px;
 }
 
 .admin-user-table th,
 .admin-user-table td {
   white-space: nowrap !important;
-  padding: 12px 18px !important;
-  text-align: left;
+  padding: 8px 10px !important;
+  text-align: center !important;
+  border: 1px solid rgba(32, 52, 58, 0.18) !important;
 }
 
 .admin-user-table th {
   font-weight: 800;
   color: var(--text-secondary);
-  border-bottom: 2px solid var(--text-ink);
+  border-bottom: 2px solid var(--text-ink) !important;
   background: var(--bg-paper);
 }
 
 .admin-user-table td {
-  border-bottom: 1px solid rgba(32, 52, 58, 0.08);
   vertical-align: middle;
   color: var(--text-ink);
-}
-
-.admin-user-table th:nth-child(5), 
-.admin-user-table td:nth-child(5) {
-  min-width: 320px !important;
-}
-
-.admin-user-table th:nth-child(3), 
-.admin-user-table td:nth-child(3) {
-  min-width: 160px !important;
-}
-
-.admin-user-table th:nth-child(7), 
-.admin-user-table td:nth-child(7) {
-  min-width: 140px !important;
 }
 
 .admin-user-table tbody tr:hover {
