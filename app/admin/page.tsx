@@ -8,6 +8,7 @@ interface UserRecord {
   profileImage: string;
   status: "approved" | "blocked";
   updatedAt: string;
+  lastActiveAt?: string;
   geminiCost?: number;
   whisperCost?: number;
   groundingCount?: number;
@@ -371,8 +372,8 @@ export default function AdminPage() {
               valA = (a.geminiCost || 0) + (a.whisperCost || 0);
               valB = (b.geminiCost || 0) + (b.whisperCost || 0);
             } else if (sortKey === "updatedAt") {
-              valA = a.updatedAt || "";
-              valB = b.updatedAt || "";
+              valA = a.lastActiveAt || a.updatedAt || "";
+              valB = b.lastActiveAt || b.updatedAt || "";
             }
 
             if (valA < valB) return sortDirection === "asc" ? -1 : 1;
@@ -478,7 +479,7 @@ export default function AdminPage() {
                           </td>
                           {/* 6. 최종 활동 시각 */}
                           <td className="text-gray" style={{ fontSize: "11px" }}>
-                            {formatDate(user.updatedAt)}
+                            {formatDate(user.lastActiveAt || user.updatedAt)}
                           </td>
                           {/* 7. 상태 */}
                           <td>

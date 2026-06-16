@@ -4,6 +4,7 @@ export interface FirestoreUser {
   profileImage: string;
   status: "approved" | "blocked";
   updatedAt: string;
+  lastActiveAt?: string;
   geminiCost: number;
   whisperCost: number;
   groundingCount: number;
@@ -64,6 +65,7 @@ export async function upsertUser(
     const finalGeminiCost = geminiCost !== undefined ? geminiCost : (existing?.geminiCost || 0);
     const finalWhisperCost = whisperCost !== undefined ? whisperCost : (existing?.whisperCost || 0);
     const finalGroundingCount = groundingCount !== undefined ? groundingCount : (existing?.groundingCount || 0);
+    const finalLastActiveAt = existing?.lastActiveAt || existing?.updatedAt || new Date().toISOString();
 
     const fields: any = {
       nickname: { stringValue: nickname },
@@ -72,7 +74,8 @@ export async function upsertUser(
       geminiCost: { doubleValue: finalGeminiCost },
       whisperCost: { doubleValue: finalWhisperCost },
       groundingCount: { integerValue: finalGroundingCount },
-      updatedAt: { stringValue: new Date().toISOString() }
+      updatedAt: { stringValue: new Date().toISOString() },
+      lastActiveAt: { stringValue: finalLastActiveAt }
     };
 
     // Use PATCH to create or update/merge the document at /users/{kakaoId}
@@ -130,7 +133,8 @@ export async function incrementUserCost(
       geminiCost: { doubleValue: geminiCost },
       whisperCost: { doubleValue: whisperCost },
       groundingCount: { integerValue: groundingCount },
-      updatedAt: { stringValue: new Date().toISOString() }
+      updatedAt: { stringValue: new Date().toISOString() },
+      lastActiveAt: { stringValue: new Date().toISOString() }
     };
 
     const res = await fetch(`${baseUrl}/users/${kakaoId}`, {
@@ -173,9 +177,9 @@ export async function getAllUsers(): Promise<FirestoreUser[]> {
       .map(parseFirestoreDoc)
       .filter((u: any): u is FirestoreUser => u !== null);
 
-    // Sort by latest updatedAt first
+    // Sort by latest lastActiveAt (or updatedAt as fallback) first
     return users.sort(
-      (a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      (a: any, b: any) => new Date(b.lastActiveAt || b.updatedAt).getTime() - new Date(a.lastActiveAt || a.updatedAt).getTime()
     );
   } catch (err) {
     console.error("[FIREBASE] getAllUsers error:", err);
@@ -213,6 +217,7 @@ function parseFirestoreDoc(doc: any): FirestoreUser | null {
     profileImage: fields.profileImage?.stringValue || "",
     status: (fields.status?.stringValue || "approved") as "approved" | "blocked",
     updatedAt: fields.updatedAt?.stringValue || new Date().toISOString(),
+    lastActiveAt: fields.lastActiveAt?.stringValue || fields.updatedAt?.stringValue || new Date().toISOString(),
     geminiCost: parseCost(fields.geminiCost),
     whisperCost: parseCost(fields.whisperCost),
     groundingCount: parseInteger(fields.groundingCount)
