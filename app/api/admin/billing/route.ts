@@ -53,10 +53,27 @@ export async function GET(request: Request) {
       `;
 
       const queryOptions: any = { query };
+      const debugQuery = `
+        SELECT cost, invoice.month, usage_start_time, service.description, project.id as project_id
+        FROM \`${billingTableId}\`
+        ORDER BY usage_start_time DESC
+        LIMIT 10
+      `;
+      const debugOptions: any = { query: debugQuery };
+
       if (process.env.GCP_BIGQUERY_LOCATION) {
         queryOptions.location = process.env.GCP_BIGQUERY_LOCATION;
+        debugOptions.location = process.env.GCP_BIGQUERY_LOCATION;
       }
+      
       const [rows] = await bigquery.query(queryOptions);
+      let debugRows: any[] = [];
+      try {
+        const [dRows] = await bigquery.query(debugOptions);
+        debugRows = dRows;
+      } catch (dErr: any) {
+        debugRows = [{ error: dErr.message }];
+      }
       
       // cost 값에 소수점이 포함되어 있을 수 있고 원화로 환산하기 위해 소수점 버림/반올림 처리
       const totalCost = rows[0]?.totalSpend || 0;
@@ -68,7 +85,8 @@ export async function GET(request: Request) {
         spend,
         limit,
         balance,
-        status: "active"
+        status: "active",
+        debug: debugRows
       });
     } catch (dbError: any) {
       // 테이블이 존재하지 않거나 초기 내보내기 딜레이(24시간) 중인 경우의 예외 처리
