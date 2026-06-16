@@ -124,7 +124,8 @@ export default function AdminPage() {
           limit: data.limit,
           balance: data.balance,
           status: data.status,
-          errorDetails: data.errorDetails
+          errorDetails: data.errorDetails,
+          debug: data.debug
         });
       }
     } catch (err: any) {
