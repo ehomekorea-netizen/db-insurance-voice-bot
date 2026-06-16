@@ -52,10 +52,11 @@ export async function GET(request: Request) {
         WHERE invoice.month = FORMAT_DATE('%Y%m', CURRENT_DATE())
       `;
 
-      const [rows] = await bigquery.query({
-        query,
-        location: process.env.GCP_BIGQUERY_LOCATION || "US"
-      });
+      const queryOptions: any = { query };
+      if (process.env.GCP_BIGQUERY_LOCATION) {
+        queryOptions.location = process.env.GCP_BIGQUERY_LOCATION;
+      }
+      const [rows] = await bigquery.query(queryOptions);
       
       // cost 값에 소수점이 포함되어 있을 수 있고 원화로 환산하기 위해 소수점 버림/반올림 처리
       const totalCost = rows[0]?.totalSpend || 0;
