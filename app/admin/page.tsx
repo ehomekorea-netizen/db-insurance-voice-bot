@@ -18,6 +18,7 @@ interface BillingData {
   limit: number;
   balance: number;
   status: string;
+  errorDetails?: string;
 }
 
 export default function AdminPage() {
@@ -120,7 +121,8 @@ export default function AdminPage() {
           spend: data.spend,
           limit: data.limit,
           balance: data.balance,
-          status: data.status
+          status: data.status,
+          errorDetails: data.errorDetails
         });
       }
     } catch (err: any) {
@@ -505,9 +507,27 @@ export default function AdminPage() {
                 </span>
               )}
               {billingData?.status === "error_fallback" && (
-                <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "bold" }}>
-                  (연동 대기중 - 테이블 생성 중)
-                </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: "bold" }}>
+                    (연동 대기중 - 테이블 생성 중)
+                  </span>
+                  {billingData.errorDetails && (
+                    <p style={{ 
+                      fontSize: "10px", 
+                      color: "#dc2626", 
+                      background: "#fef2f2", 
+                      padding: "6px 10px", 
+                      border: "1.5px solid #fee2e2", 
+                      borderRadius: "6px", 
+                      fontWeight: "normal",
+                      margin: "4px 0 0 0",
+                      textAlign: "left",
+                      whiteSpace: "pre-wrap"
+                    }}>
+                      🚨 구글 에러 원인: {billingData.errorDetails}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
             
