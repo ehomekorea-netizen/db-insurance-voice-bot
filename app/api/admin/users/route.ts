@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, getUser, upsertUser } from "@/lib/firebase";
+import { getAllUsers, getUser, upsertUser, getUserChatLogs, updateUserLastActiveAt } from "@/lib/firebase";
 
 // Helper for administrative token authentication check
 function verifyAdmin(request: Request): boolean {
@@ -15,7 +15,36 @@ export async function GET(request: Request) {
     }
 
     const users = await getAllUsers();
-    return NextResponse.json({ success: true, users });
+
+    // Auto-heal: Verify and align lastActiveAt with the actual last chat message timestamp from chat_logs
+    const healedUsers = await Promise.all(
+      users.map(async (user) => {
+        try {
+          const logs = await getUserChatLogs(user.id);
+          if (logs.length > 0) {
+            const latestLog = logs[logs.length - 1];
+            const latestTimestamp = latestLog.timestamp;
+
+            // If the recorded lastActiveAt differs from the actual latest chat log timestamp, correct it in DB
+            if (user.lastActiveAt !== latestTimestamp) {
+              console.log(`[HEALER] Aligning user ${user.nickname} (${user.id}) activity time to actual last message: ${latestTimestamp} (was ${user.lastActiveAt})`);
+              await updateUserLastActiveAt(user.id, latestTimestamp);
+              return { ...user, lastActiveAt: latestTimestamp };
+            }
+          }
+        } catch (healErr) {
+          console.error(`[HEALER] Error healing user ${user.id}:`, healErr);
+        }
+        return user;
+      })
+    );
+
+    // Re-sort healed users by latest lastActiveAt (or updatedAt as fallback)
+    healedUsers.sort(
+      (a: any, b: any) => new Date(b.lastActiveAt || b.updatedAt).getTime() - new Date(a.lastActiveAt || a.updatedAt).getTime()
+    );
+
+    return NextResponse.json({ success: true, users: healedUsers });
   } catch (error: any) {
     console.error("[ADMIN USERS GET] Error:", error);
     return NextResponse.json(

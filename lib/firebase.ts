@@ -357,4 +357,35 @@ export async function deleteUserChatLogs(userId: string): Promise<boolean> {
   }
 }
 
+// 사용자 최종 활동 시각 필드만 업데이트
+export async function updateUserLastActiveAt(
+  kakaoId: string,
+  lastActiveAt: string
+): Promise<boolean> {
+  const baseUrl = getBaseUrl();
+  if (!baseUrl) return false;
+
+  try {
+    const fields: any = {
+      lastActiveAt: { stringValue: lastActiveAt }
+    };
+
+    const res = await fetch(`${baseUrl}/users/${kakaoId}?updateMask.fieldPaths=lastActiveAt`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[FIREBASE] updateUserLastActiveAt PATCH error: ${res.status} - ${errText}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[FIREBASE] updateUserLastActiveAt error for ID ${kakaoId}:`, err);
+    return false;
+  }
+}
+
 
