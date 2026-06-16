@@ -30,10 +30,18 @@ export async function GET(request: Request) {
     }
 
     try {
-      // BigQuery 클라이언트 초기화
       const credentials = JSON.parse(serviceAccountKey);
+      const realProjectId = credentials.project_id;
+
+      // Force process.env project override to bypass auto-detected gen-lang-client from Gemini API key
+      if (realProjectId) {
+        process.env.GOOGLE_CLOUD_PROJECT = realProjectId;
+        process.env.GCLOUD_PROJECT = realProjectId;
+      }
+
+      // BigQuery 클라이언트 초기화
       const bigquery = new BigQuery({
-        projectId: credentials.project_id,
+        projectId: realProjectId,
         credentials,
       });
 
