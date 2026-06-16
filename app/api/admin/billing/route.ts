@@ -74,6 +74,31 @@ export async function GET(request: Request) {
       // 테이블이 존재하지 않거나 초기 내보내기 딜레이(24시간) 중인 경우의 예외 처리
       console.error("[ADMIN BILLING] BigQuery query error:", dbError);
       
+      let extraInfo = "";
+      try {
+        const parts = billingTableId.split(".");
+        const datasetId = parts.length >= 2 ? parts[parts.length - 2] : "gcp_billing";
+        
+        const credentials = JSON.parse(serviceAccountKey);
+        const bigquery = new BigQuery({
+          projectId: credentials.project_id,
+          credentials,
+        });
+        
+        const dataset = bigquery.dataset(datasetId);
+        const [tables] = await dataset.getTables();
+        const tableIds = tables.map(t => t.id);
+        
+        if (tableIds.length === 0) {
+          extraInfo = `\n🔍 진단 결과: '${datasetId}' 데이터세트는 존재하지만 내부에 결제 테이블이 아직 0개입니다. (구글 클라우드 결제 데이터의 첫 전송 대기 상태가 확실합니다)`;
+        } else {
+          extraInfo = `\n🔍 진단 결과: '${datasetId}' 데이터세트 내에 존재하는 테이블 목록은 [${tableIds.join(", ")}] 입니다. 설정하신 환경 변수 테이블 ID와 스펠링이 일치하는지 대조해 보세요.`;
+        }
+      } catch (inspectErr: any) {
+        console.error("[ADMIN BILLING INSPECT] Failed to list tables:", inspectErr);
+        extraInfo = `\n🔍 진단 결과: 데이터세트 목록 조회 자체가 실패했습니다 (${inspectErr.message})`;
+      }
+
       // 테이블 미생성이나 권한 부족인 경우 0원 처리로 크래시 방지
       return NextResponse.json({
         success: true,
@@ -81,7 +106,7 @@ export async function GET(request: Request) {
         limit: limit,
         balance: limit,
         status: "error_fallback",
-        errorDetails: dbError.message
+        errorDetails: dbError.message + extraInfo
       });
     }
   } catch (error: any) {
