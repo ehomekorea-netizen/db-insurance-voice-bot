@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     const serviceAccountKey = process.env.GCP_SERVICE_ACCOUNT_KEY;
     const billingTableId = process.env.GCP_BILLING_TABLE_ID;
-    const limit = 16000; // 선불 예산 한도 (16,000원)
+    const limit = process.env.GCP_BILLING_LIMIT ? Number(process.env.GCP_BILLING_LIMIT) : 16000; // 선불 예산 한도
 
     const offset = process.env.GCP_BILLING_OFFSET ? Number(process.env.GCP_BILLING_OFFSET) : 0;
 
