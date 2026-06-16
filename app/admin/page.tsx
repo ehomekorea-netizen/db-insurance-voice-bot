@@ -574,26 +574,7 @@ export default function AdminPage() {
                   선불 충전금 <strong>₩{billingData.limit.toLocaleString("ko-KR")}</strong> 기준으로 소모 시 잔액이 자동으로 갱신됩니다.
                 </div>
 
-                {billingData.debug && (
-                  <pre style={{ 
-                    fontSize: "10px", 
-                    background: "#f1f5f9", 
-                    padding: "10px", 
-                    borderRadius: "6px", 
-                    overflow: "auto", 
-                    maxHeight: "200px", 
-                    marginTop: "12px", 
-                    textAlign: "left",
-                    border: "1.5px solid var(--panel-border, #e2e8f0)",
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                    color: "var(--text-ink)"
-                  }}>
-                    🔍 BigQuery 실시간 테이블 데이터 진단 목록 (최근 10건):
-                    {"\n" + JSON.stringify(billingData.debug, null, 2)}
-                  </pre>
-                )}
+
               </div>
             ) : null}
           </div>
