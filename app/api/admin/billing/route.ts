@@ -31,8 +31,10 @@ export async function GET(request: Request) {
 
     try {
       // BigQuery 클라이언트 초기화
+      const credentials = JSON.parse(serviceAccountKey);
       const bigquery = new BigQuery({
-        credentials: JSON.parse(serviceAccountKey),
+        projectId: credentials.project_id,
+        credentials,
       });
 
       // 이번 달의 총 지출액을 합산하는 쿼리
