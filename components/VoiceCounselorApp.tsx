@@ -199,12 +199,12 @@ export function VoiceCounselorApp() {
 
     const fadeTimeout = setTimeout(() => {
       setFadeCover(true);
-    }, 2500);
+    }, 1500);
 
     const removeTimeout = setTimeout(() => {
       setShowCover(false);
       setHasStartedConsultation(true);
-    }, 3000);
+    }, 2000);
 
     return () => {
       clearTimeout(fadeTimeout);
