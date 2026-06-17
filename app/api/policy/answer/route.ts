@@ -15,6 +15,40 @@ function getUUIDShort(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
+function hasRepetitionLoop(text: string): boolean {
+  // 1. Check if a single character (like '0' or a Hanzi/Korean character) repeats consecutively 12 times
+  if (/(.)\1{11,}/.test(text)) {
+    return true;
+  }
+  // 2. Check if a pattern of 2 to 10 characters repeats consecutively 4 times
+  if (/(.{2,10}?)\1{3,}/.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function cleanRepetitiveText(text: string): string {
+  let cleaned = text;
+
+  // 1. Replace single characters repeating 10+ times
+  const singleCharRegex = /(.)\1{9,}/g;
+  cleaned = cleaned.replace(singleCharRegex, (match) => {
+    const char = match[0];
+    if (/[0-9]/.test(char)) {
+      return char + char + char + "... [중략]";
+    }
+    return "... [중략]";
+  });
+
+  // 2. Replace patterns of 2-10 characters repeating 4+ times (meaning the pattern plus 3 repetitions)
+  const phraseRegex = /(.{2,10}?)\1{3,}/g;
+  cleaned = cleaned.replace(phraseRegex, (match, group) => {
+    return group + "... [중략]";
+  });
+
+  return cleaned;
+}
+
 type PolicyAnswerRequest = {
   question?: string;
   intent?: PolicyIntent;
@@ -230,7 +264,9 @@ export async function POST(request: Request) {
         ]
       },
       generationConfig: {
-        temperature: 0.1
+        temperature: 0.1,
+        frequencyPenalty: 0.6,
+        presencePenalty: 0.6
       }
     };
 
@@ -280,6 +316,10 @@ export async function POST(request: Request) {
           reader = await getGeminiStreamReader(modelName, usedSearch);
         } catch (err: any) {
           console.warn(`[Gemini API Warning] ${modelName} with search grounding failed or timed out:`, err.message || err);
+          if (requestBody.generationConfig) {
+            delete (requestBody.generationConfig as any).frequencyPenalty;
+            delete (requestBody.generationConfig as any).presencePenalty;
+          }
           modelName = "gemini-3.1-flash-lite";
           usedSearch = false;
           try {
@@ -300,10 +340,20 @@ export async function POST(request: Request) {
           let buffer = "";
           let fullText = "";
           let groundingMetadata: any = null;
+          let doneForced = false;
 
           while (true) {
             const { value, done } = await reader.read();
-            if (done) break;
+            if (done || doneForced) {
+              if (doneForced) {
+                try {
+                  await reader.cancel();
+                } catch (cancelErr) {
+                  console.error("[Gemini Stream] Cancel reader error:", cancelErr);
+                }
+              }
+              break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
 
@@ -344,8 +394,20 @@ export async function POST(request: Request) {
                       const obj = JSON.parse(jsonStr);
                       const text = obj.candidates?.[0]?.content?.parts?.[0]?.text || "";
                       if (text) {
-                        fullText += text;
-                        writeChunk(text);
+                        const candidateFullText = fullText + text;
+                        if (hasRepetitionLoop(candidateFullText)) {
+                          console.warn("[Gemini Stream Repetition Filter] Repetition loop detected! Cutting stream early.");
+                          const cleaned = cleanRepetitiveText(candidateFullText);
+                          const delta = cleaned.slice(fullText.length);
+                          if (delta) {
+                            writeChunk(delta);
+                          }
+                          fullText = cleaned;
+                          doneForced = true;
+                        } else {
+                          fullText += text;
+                          writeChunk(text);
+                        }
                       }
                       const meta = obj.candidates?.[0]?.groundingMetadata;
                       if (meta) {
