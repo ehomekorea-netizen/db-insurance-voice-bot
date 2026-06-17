@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/generate-guide-audio.js && next build",
+    "build": "next build",
     "start": "next start",
-    "check": "node scripts/generate-guide-audio.js && next build"
+    "check": "next build"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^8.3.1",
