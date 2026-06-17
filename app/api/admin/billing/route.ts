@@ -19,14 +19,26 @@ export async function GET(request: Request) {
 
     const offset = process.env.GCP_BILLING_OFFSET ? Number(process.env.GCP_BILLING_OFFSET) : 0;
 
-    // 환경 변수가 아예 설정되지 않은 경우 모크 데이터로 안전하게 폴백
+    // 1. Fetch real-time user costs from Firestore first (100% real-time sync)
+    let dbSpend = offset;
+    try {
+      const { getAllUsers } = await import("@/lib/firebase");
+      const allUsers = await getAllUsers();
+      const firestoreTotal = allUsers.reduce((sum, u) => sum + (u.geminiCost || 0) + (u.whisperCost || 0), 0);
+      dbSpend = Math.round(firestoreTotal) + offset;
+      console.log(`[ADMIN BILLING] Firestore Real-time total calculated: ₩${dbSpend} (Offset: ₩${offset})`);
+    } catch (fbErr) {
+      console.error("[ADMIN BILLING] Failed to calculate real-time Firestore cost:", fbErr);
+    }
+
+    // 환경 변수가 아예 설정되지 않은 경우 Firestore 실시간 데이터로 안전하게 폴백
     if (!serviceAccountKey || !billingTableId) {
-      console.warn("[ADMIN BILLING] GCP environment variables are not set. Falling back to mock data.");
+      console.warn("[ADMIN BILLING] GCP environment variables are not set. Falling back to Firestore real-time total.");
       return NextResponse.json({
         success: true,
-        spend: offset,
+        spend: dbSpend,
         limit: limit,
-        balance: Math.max(0, limit - offset),
+        balance: Math.max(0, limit - dbSpend),
         status: "mock_fallback"
       });
     }
@@ -79,7 +91,8 @@ export async function GET(request: Request) {
       
       // cost 값에 소수점이 포함되어 있을 수 있고 원화로 환산하기 위해 소수점 버림/반올림 처리
       const totalCost = rows[0]?.totalSpend || 0;
-      const spend = Math.round(Number(totalCost)) + offset;
+      const bqSpend = Math.round(Number(totalCost)) + offset;
+      const spend = Math.max(bqSpend, dbSpend);
       const balance = Math.max(0, limit - spend);
 
       return NextResponse.json({
@@ -119,12 +132,12 @@ export async function GET(request: Request) {
         extraInfo = `\n🔍 진단 결과: 데이터세트 목록 조회 자체가 실패했습니다 (${inspectErr.message})`;
       }
 
-      // 테이블 미생성이나 권한 부족인 경우 0원 처리로 크래시 방지
+      // 테이블 미생성이나 권한 부족인 경우 Firestore 데이터 기준으로 실시간 표기하여 크래시 방지
       return NextResponse.json({
         success: true,
-        spend: offset,
+        spend: dbSpend,
         limit: limit,
-        balance: Math.max(0, limit - offset),
+        balance: Math.max(0, limit - dbSpend),
         status: "error_fallback",
         errorDetails: dbError.message + extraInfo
       });
