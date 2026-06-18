@@ -273,6 +273,34 @@ export function VoiceCounselorApp() {
               }
 
               const parsed = parseStreamedText(log.content);
+
+              // Reconstruct citations from the markdown links in log.content
+              const parsedCitations: any[] = [];
+              const citationRegex = /[-*•\s]*\[출처:\s*([\s\S]+?)\]\s*\((https?:\/\/[^\)]+)\)/g;
+              let match;
+              citationRegex.lastIndex = 0;
+              while ((match = citationRegex.exec(log.content)) !== null) {
+                const title = match[1].trim();
+                const url = match[2].trim();
+                const lowUrl = url.toLowerCase();
+                let section = "웹 검색 정보";
+                if (lowUrl.includes("idbins.com") || lowUrl.includes("idb.co.kr")) section = "DB손보 공식";
+                else if (lowUrl.includes("fss.or.kr") || lowUrl.includes("fsc.go.kr")) section = "금융당국";
+                else if (lowUrl.includes("knia.or.kr") || lowUrl.includes("klia.or.kr") || lowUrl.includes("kidi.or.kr")) section = "보험협회";
+                else if (lowUrl.includes("korea.kr") || lowUrl.includes("law.go.kr")) section = "정부/법령";
+                else if (lowUrl.includes("nhis.or.kr") || lowUrl.includes("hira.or.kr")) section = "보건의료";
+
+                parsedCitations.push({
+                  id: `citation-${parsedCitations.length + 1}-${Math.random().toString(36).substring(2, 10)}`,
+                  title,
+                  section,
+                  page: 1,
+                  version: "공식 정보",
+                  sourceUrl: url,
+                  excerpt: title
+                });
+              }
+
               const answer = {
                 id: log.id,
                 question,
@@ -281,8 +309,12 @@ export function VoiceCounselorApp() {
                 summary: parsed.summary,
                 conditions: parsed.conditions,
                 cautions: parsed.cautions,
-                requiredInfo: [],
-                citations: [],
+                requiredInfo: [
+                  "정확한 상품 명칭 및 약관 개정 버전",
+                  "가입 시기 및 청구 항목의 영수증/진단서",
+                  "해당 상품이 판매상품인지 판매중지 상품인지 여부"
+                ],
+                citations: parsedCitations,
                 headline: getFallbackHeadline(question, parsed.summary),
                 searchEngine: "공시자료 검색",
                 modelName: "Gemini 3.1 Flash-Lite",
@@ -623,9 +655,9 @@ export function VoiceCounselorApp() {
       audio.src = audioUrl;
       activeAudioRef.current = audio;
 
-      // Adjust volume to balance levels: lower welcome.mp3 to 0.8 as requested
+      // Adjust volume to balance levels: welcome.mp3 is too loud, so lower it to 0.45 to match other 2 files (which sound like 0.6)
       if (filename === "welcome.mp3") {
-        audio.volume = 0.8;
+        audio.volume = 0.45;
       } else {
         audio.volume = 1.0;
       }
