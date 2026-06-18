@@ -778,10 +778,10 @@ export function VoiceCounselorApp() {
           }
         }
       } else {
-        // If the user has spoken, and then is silent for 3.0 seconds, stop recording and send to Whisper
-        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 3000)) {
+        // If the user has spoken, and then is silent for 2.2 seconds, stop recording and send to Whisper
+        if (hasSpokenRef.current && (now - lastActiveTimeRef.current > 2200)) {
           const totalDuration = now - recordingStartTimeRef.current;
-          const speechDuration = totalDuration - 3000;
+          const speechDuration = totalDuration - 2200;
 
           if (speechDuration < 1000) {
             console.log(`[VOICE] Speech duration too short (${speechDuration}ms). Discarding as noise.`);
@@ -811,7 +811,7 @@ export function VoiceCounselorApp() {
           hasSpokenRef.current = false;
           isRecordingRef.current = false;
           lastActiveTimeRef.current = now;
-          console.log(`[VOICE] VAD silence detected (3.0s). Stopping recorder. Speech duration: ${speechDuration}ms`);
+          console.log(`[VOICE] VAD silence detected (2.2s). Stopping recorder. Speech duration: ${speechDuration}ms`);
           resetInactivityTimer();
 
           if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
