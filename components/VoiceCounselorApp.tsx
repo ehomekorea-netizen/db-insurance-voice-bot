@@ -623,6 +623,13 @@ export function VoiceCounselorApp() {
       audio.src = audioUrl;
       activeAudioRef.current = audio;
 
+      // Adjust volume to balance levels: lower welcome.mp3 to 0.8 as requested
+      if (filename === "welcome.mp3") {
+        audio.volume = 0.8;
+      } else {
+        audio.volume = 1.0;
+      }
+
       await new Promise<void>((resolve, reject) => {
         const safetyTimeout = setTimeout(() => {
           console.warn("[VOICE] playStaticAudio safety timeout reached. Forcing resolution.");
