@@ -2312,19 +2312,16 @@ function MessageBubble({
 
         {ans.requiredInfo && ans.requiredInfo.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
-                <span className="icon-badge badge-info">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                    <line x1="9" y1="12" x2="15" y2="12"></line>
-                    <line x1="9" y1="16" x2="15" y2="16"></line>
-                  </svg>
-                </span>
-                정확한 확인을 위해 필요한 정보
+            <h4 className="section-title">
+              <span className="icon-badge badge-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  <line x1="9" y1="12" x2="15" y2="12"></line>
+                  <line x1="9" y1="16" x2="15" y2="16"></line>
+                </svg>
               </span>
-              <SectionCopyBtn sectionKey="requiredInfo" getText={() => `[정확한 확인을 위해 필요한 정보]\n${ans.requiredInfo!.map((c, i) => `${i + 1}. ${cleanListText(c)}`).join("\n")}`} />
+              정확한 확인을 위해 필요한 정보
             </h4>
             <ul className="bullet-list blue-theme">
               {ans.requiredInfo.map((item, idx) => (
@@ -2336,17 +2333,14 @@ function MessageBubble({
 
         {ans.citations && ans.citations.length > 0 && (
           <div className="answer-section" style={{ borderBottom: "none" }}>
-            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
-                <span className="icon-badge badge-citation">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                  </svg>
-                </span>
-                참고 출처 및 공시 자료
+            <h4 className="section-title">
+              <span className="icon-badge badge-citation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
               </span>
-              <SectionCopyBtn sectionKey="citations" getText={() => `[참고 출처 및 공시 자료]\n${ans.citations!.map((c) => `• ${c.section || "출처"}: ${safeDecodeURIComponent(c.title)}`).join("\n")}`} />
+              참고 출처 및 공시 자료
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
               {ans.citations.map((citation) => (
