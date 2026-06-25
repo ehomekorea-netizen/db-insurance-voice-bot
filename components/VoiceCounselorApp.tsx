@@ -2072,6 +2072,48 @@ function MessageBubble({
   const [isZoomed, setIsZoomed] = useState(false);
   const [isClothespinHovered, setIsClothespinHovered] = useState(false);
   const [isShareHovered, setIsShareHovered] = useState(false);
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+
+  function copySection(sectionKey: string, text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedSection(sectionKey);
+      setTimeout(() => setCopiedSection(null), 800);
+    });
+  }
+
+  function SectionCopyBtn({ sectionKey, getText }: { sectionKey: string; getText: () => string }) {
+    const isCopied = copiedSection === sectionKey;
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); copySection(sectionKey, getText()); }}
+        title="이 섹션 텍스트 복사"
+        style={{
+          flexShrink: 0,
+          height: "22px",
+          padding: "0 7px",
+          fontSize: "10.5px",
+          fontWeight: "700",
+          border: isCopied ? "1.5px solid var(--accent-green)" : "1.5px solid #cbd5e1",
+          borderRadius: "5px",
+          background: isCopied ? "rgba(47,118,109,0.10)" : "#f8fafc",
+          color: isCopied ? "var(--accent-green)" : "#64748b",
+          cursor: "pointer",
+          lineHeight: "1",
+          transition: "all 0.15s ease",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "3px",
+          whiteSpace: "nowrap"
+        }}
+      >
+        {isCopied ? (
+          <><span>✔</span><span>복사됨</span></>
+        ) : (
+          <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>복사</span></>
+        )}
+      </button>
+    );
+  }
 
   if (message.role === "assistant" && !message.answer) {
     const isWelcomeText = message.content.includes("PA님 무엇을 도와드릴까요?");
@@ -2200,17 +2242,20 @@ function MessageBubble({
 
         {ans.summary && (
           <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-summary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M15 4H7"/>
-                  <path d="m18 16 3 3-3 3"/>
-                  <path d="M3 4v13a2 2 0 0 0 2 2h16"/>
-                  <path d="M7 14h7"/>
-                  <path d="M7 9h12"/>
-                </svg>
+            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                <span className="icon-badge badge-summary">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <path d="M15 4H7"/>
+                    <path d="m18 16 3 3-3 3"/>
+                    <path d="M3 4v13a2 2 0 0 0 2 2h16"/>
+                    <path d="M7 14h7"/>
+                    <path d="M7 9h12"/>
+                  </svg>
+                </span>
+                핵심 답변 요약
               </span>
-              핵심 답변 요약
+              <SectionCopyBtn sectionKey="summary" getText={() => `[핵심 답변 요약]\n${ans.summary}`} />
             </h4>
             <p className="summary-text" style={{ lineHeight: "1.6", color: "#0f172a", fontWeight: "500" }}>
               {renderFormattedText(ans.summary, true)}
@@ -2220,14 +2265,17 @@ function MessageBubble({
 
         {ans.conditions && ans.conditions.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-conditions">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-                  <path d="m9 12 2 2 4-4"/>
-                </svg>
+            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                <span className="icon-badge badge-conditions">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                    <path d="m9 12 2 2 4-4"/>
+                  </svg>
+                </span>
+                보장 대상 및 지급 조건
               </span>
-              보장 대상 및 지급 조건
+              <SectionCopyBtn sectionKey="conditions" getText={() => `[보장 대상 및 지급 조건]\n${ans.conditions!.map((c, i) => `${i + 1}. ${cleanListText(c)}`).join("\n")}`} />
             </h4>
             <ul className="bullet-list green-theme">
               {ans.conditions.map((item, idx) => (
@@ -2239,15 +2287,18 @@ function MessageBubble({
 
         {ans.cautions && ans.cautions.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-cautions">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
-                  <path d="M12 9v4"/>
-                  <path d="M12 17h.01"/>
-                </svg>
+            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                <span className="icon-badge badge-cautions">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
+                    <path d="M12 9v4"/>
+                    <path d="M12 17h.01"/>
+                  </svg>
+                </span>
+                보장 제외 및 유의사항 (면책)
               </span>
-              보장 제외 및 유의사항 (면책)
+              <SectionCopyBtn sectionKey="cautions" getText={() => `[보장 제외 및 유의사항 (면책)]\n${ans.cautions!.map((c, i) => `${i + 1}. ${cleanListText(c)}`).join("\n")}`} />
             </h4>
             <ul className="bullet-list orange-theme">
               {ans.cautions.map((item, idx) => (
@@ -2261,16 +2312,19 @@ function MessageBubble({
 
         {ans.requiredInfo && ans.requiredInfo.length > 0 && (
           <div className="answer-section">
-            <h4 className="section-title">
-              <span className="icon-badge badge-info">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                  <line x1="9" y1="12" x2="15" y2="12"></line>
-                  <line x1="9" y1="16" x2="15" y2="16"></line>
-                </svg>
+            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                <span className="icon-badge badge-info">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    <line x1="9" y1="12" x2="15" y2="12"></line>
+                    <line x1="9" y1="16" x2="15" y2="16"></line>
+                  </svg>
+                </span>
+                정확한 확인을 위해 필요한 정보
               </span>
-              정확한 확인을 위해 필요한 정보
+              <SectionCopyBtn sectionKey="requiredInfo" getText={() => `[정확한 확인을 위해 필요한 정보]\n${ans.requiredInfo!.map((c, i) => `${i + 1}. ${cleanListText(c)}`).join("\n")}`} />
             </h4>
             <ul className="bullet-list blue-theme">
               {ans.requiredInfo.map((item, idx) => (
@@ -2282,14 +2336,17 @@ function MessageBubble({
 
         {ans.citations && ans.citations.length > 0 && (
           <div className="answer-section" style={{ borderBottom: "none" }}>
-            <h4 className="section-title">
-              <span className="icon-badge badge-citation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                </svg>
+            <h4 className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                <span className="icon-badge badge-citation">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="section-icon">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                  </svg>
+                </span>
+                참고 출처 및 공시 자료
               </span>
-              참고 출처 및 공시 자료
+              <SectionCopyBtn sectionKey="citations" getText={() => `[참고 출처 및 공시 자료]\n${ans.citations!.map((c) => `• ${c.section || "출처"}: ${safeDecodeURIComponent(c.title)}`).join("\n")}`} />
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
               {ans.citations.map((citation) => (
